@@ -1,8 +1,0 @@
-{
-  "note": "3Dキッチンを目の位置から90°ずつ撮った5方向の参照画像を、AI（Higgsfield / GPT Image 2.5）で写真風にしたもの。元画像は assets/realkitchen/ref/",
-  "front": "./assets/real-kitchen/front.jpg",
-  "left": "./assets/real-kitchen/left.jpg",
-  "right": "./assets/real-kitchen/right.jpg",
-  "up": "./assets/real-kitchen/up.jpg",
-  "down": "./assets/real-kitchen/down.jpg"
-}

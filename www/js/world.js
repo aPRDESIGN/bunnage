@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291707';
-import { sfx } from './audio.js?v=202609291707';
-import { haptics } from './haptics.js?v=202609291707';
+import * as TX from './textures.js?v=202609291717';
+import { sfx } from './audio.js?v=202609291717';
+import { haptics } from './haptics.js?v=202609291717';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -72,10 +72,10 @@ export class World {
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color('#1a1b1d');
+    this.scene.background = new THREE.Color('#0d0e0f');
     const pm = new THREE.PMREMGenerator(r);
     this.scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.42;
+    this.scene.environmentIntensity = 0.18;
 
     this.camera = new THREE.PerspectiveCamera(72, 1, 0.03, 30);
     this.camera.position.copy(EYE);
@@ -112,18 +112,31 @@ export class World {
     this.build();
   }
 
+  // 夜。天井の蛍光灯は弱く、ときどきちらつく。手元灯だけが少し明るい。窓の外は暗い青
   _lights() {
     const s = this.scene;
-    s.add(new THREE.HemisphereLight('#fff6e8', '#6b5b48', 0.4));
-    const ceil = new THREE.PointLight('#fff4e2', 4.5, 0, 2); ceil.position.set(0, 2.25, 0.5); s.add(ceil);
-    const d = this.sun = new THREE.DirectionalLight('#fffaf0', 1.0);
-    d.position.set(0.9, 3.4, 2.3); d.target.position.set(0, 0.6, -0.4);
+    s.add(new THREE.HemisphereLight('#9aa3a8', '#2a241e', 0.16));
+    const ceil = this.ceilLight = new THREE.PointLight('#ffe7c2', 2.0, 0, 2); ceil.position.set(0, 2.25, 0.5); s.add(ceil);
+    const d = this.sun = new THREE.DirectionalLight('#ffdcae', 0.55);
+    d.position.set(0.3, 2.35, 0.6); d.target.position.set(0, 0.4, -0.6);
     d.castShadow = true; d.shadow.mapSize.set(1024, 1024);
-    const sc = d.shadow.camera; sc.left = -2.6; sc.right = 2.6; sc.top = 2.4; sc.bottom = -2.2; sc.near = 0.5; sc.far = 8;
+    const sc = d.shadow.camera; sc.left = -2.6; sc.right = 2.6; sc.top = 2.4; sc.bottom = -2.2; sc.near = 0.3; sc.far = 6;
     d.shadow.bias = -0.0008; d.shadow.normalBias = 0.02;
     s.add(d, d.target);
-    const under = new THREE.PointLight('#fff8ea', 1.2, 2.2, 2); under.position.set(-0.55, 1.45, -0.7); s.add(under);
-    const win = new THREE.PointLight('#e8f2ff', 1.4, 3.5, 2); win.position.set(-1.9, 1.5, 1.15); s.add(win);
+    const under = this.underLight = new THREE.PointLight('#e9f3de', 1.6, 2.4, 2); under.position.set(-0.55, 1.45, -0.7); s.add(under);
+    const win = new THREE.PointLight('#5f7894', 0.9, 3.2, 2); win.position.set(-1.95, 1.5, 1.15); s.add(win);
+    this.flicker = { next: 4 + Math.random() * 6, t: 0, on: true };
+  }
+
+  // 蛍光灯のちらつき
+  _updateFlicker(dt) {
+    const f = this.flicker; if (!f) return;
+    f.next -= dt;
+    if (f.next <= 0) { f.t = 0.08 + Math.random() * 0.35; f.next = 5 + Math.random() * 12; }
+    let k = 1;
+    if (f.t > 0) { f.t -= dt; k = Math.random() < 0.55 ? 0.15 : 0.8; }
+    this.ceilLight.intensity = 2.0 * k; this.sun.intensity = 0.55 * k;
+    if (this.lampMat) this.lampMat.emissiveIntensity = 0.9 * k;
   }
 
   resize(w, h) {
@@ -141,9 +154,8 @@ export class World {
     this.statics = [];
     this.fridgeFront = null;
     this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items();
-    if (this.stageType === 'real') this._makeReal();
     // 写真の明るさに3Dの小物を少し寄せる
-    this.renderer.toneMappingExposure = this.stageType === 'real' ? 0.72 : 0.82;
+    this.renderer.toneMappingExposure = 0.8;
     this._wakeGuard = this.clock + 0.3;
   }
 
@@ -186,52 +198,15 @@ export class World {
     this.stage.add(m); return m;
   }
 
-  // ---- 写真のキッチン ----
-  // 固定の目の位置から撮った5方向の写真を、撮ったときと同じ向き・画角の板として目の周りに並べる。
-  // 3Dの部屋は見えない「影だけ」の面にして、物理・当たり判定・影・傷・卵の跡の土台として使う。
-  static async loadPhotos(urls, onProgress) {
-    const loader = new THREE.TextureLoader(); loader.setCrossOrigin('anonymous');
-    const keys = Object.keys(urls); let done = 0;
-    const out = {};
-    await Promise.all(keys.map(k => new Promise((res, rej) => loader.load(urls[k], (t) => {
-      t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; out[k] = t; done++; onProgress && onProgress(done / keys.length); res();
-    }, undefined, rej))));
-    return out;
-  }
-  _makeReal() {
-    const faces = this.photoFaces; if (!faces) return;
-    const dyn = new Set(this.dyn.map(r => r.mesh));
-    const shadowMat = this._shadowMat || (this._shadowMat = new THREE.ShadowMaterial({ opacity: 0.22 }));
-    for (const o of [...this.stage.children]) {
-      if (!o.isMesh || dyn.has(o)) continue;
-      o.material = shadowMat; o.castShadow = false; o.receiveShadow = true;
-      o.traverse(c => { if (c !== o && c.isMesh) { c.material = shadowMat; c.castShadow = false; } });
-    }
-    const sky = new THREE.Group(); sky.position.copy(EYE);
-    const d = 6;
-    const dirs = { front: [0, 0], left: [Math.PI / 2, 0], right: [-Math.PI / 2, 0], up: [0, Math.PI / 2], down: [0, -Math.PI / 2] };
-    for (const [k, [yaw, pitch]] of Object.entries(dirs)) {
-      if (!faces[k]) continue;
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d, 2 * d), new THREE.MeshBasicMaterial({ map: faces[k], depthTest: false, depthWrite: false, toneMapped: false }));
-      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
-      m.position.copy(new THREE.Vector3(0, 0, -d).applyQuaternion(q)); m.quaternion.copy(q);
-      m.renderOrder = -10; m.frustumCulled = false;
-      sky.add(m);
-    }
-    const back = new THREE.Mesh(new THREE.PlaneGeometry(2 * d, 2 * d), new THREE.MeshBasicMaterial({ color: '#bdb6aa', depthTest: false, depthWrite: false, toneMapped: false }));
-    back.position.set(0, 0, d); back.rotation.y = Math.PI; back.renderOrder = -11; sky.add(back);
-    this.stage.add(sky);
-  }
-
   _room() {
     const { x0, x1, z0, z1, h } = ROOM;
     const W = x1 - x0, D = z1 - z0;
-    const wallMat = (rx, ry) => this.mat('#ffffff', 0.9, 0, { map: TX.wallpaper(rx, ry) });
+    const wallMat = (rx, ry) => this.mat('#cfc6b4', 0.9, 0, { map: TX.wallpaper(rx, ry) });
     // 床
     const T = 1.0;
     this.box(W, 0.1, D, 0, -0.05, (z0 + z1) / 2, this.mat('#ffffff', 0.55, 0, { map: TX.floor(W / 0.6, D / 1.2) }), { surface: 'floor', pd: [W + 2, T, D + 2], pp: [0, -T / 2, (z0 + z1) / 2] });
     // 天井
-    this.box(W, 0.1, D, 0, h + 0.05, (z0 + z1) / 2, this.mat('#f3f1ea', 0.95), { surface: 'wall', pd: [W + 2, T, D + 2], pp: [0, h + T / 2, (z0 + z1) / 2] });
+    this.box(W, 0.1, D, 0, h + 0.05, (z0 + z1) / 2, this.mat('#bdb5a6', 0.95), { surface: 'wall', pd: [W + 2, T, D + 2], pp: [0, h + T / 2, (z0 + z1) / 2] });
     // 奥の壁・左右の壁・背後の壁
     this.box(W, h, 0.1, 0, h / 2, z0 - 0.05, wallMat(W / 0.8, h / 0.8), { surface: 'wall', pd: [W + 2, h + 2, T], pp: [0, h / 2, z0 - T / 2] });
     this.box(0.1, h, D, x0 - 0.05, h / 2, (z0 + z1) / 2, wallMat(D / 0.8, h / 0.8), { surface: 'wall', pd: [T, h + 2, D + 2], pp: [x0 - T / 2, h / 2, (z0 + z1) / 2] });
@@ -243,13 +218,14 @@ export class World {
     this.box(0.01, 0.06, D, x0 + 0.005, 0.03, (z0 + z1) / 2, skirting, { phys: false });
     this.box(0.01, 0.06, D, x1 - 0.005, 0.03, (z0 + z1) / 2, skirting, { phys: false });
     // 丸い蛍光灯
-    const lamp = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 12, 40), this.mat('#ffffff', 0.4, 0, { emissive: '#fff6e6', emissiveIntensity: 1.6 }));
+    this.lampMat = this.mat('#ffffff', 0.4, 0, { emissive: '#ffe9c8', emissiveIntensity: 0.9 });
+    const lamp = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 12, 40), this.lampMat);
     lamp.rotation.x = Math.PI / 2; lamp.position.set(0, 2.33, 0.5); this.stage.add(lamp);
-    const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.06, 40), this.mat('#f7f5ef', 0.3, 0, { transparent: true, opacity: 0.55, emissive: '#fff4de', emissiveIntensity: 0.5 }));
+    const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.06, 40), this.mat('#f7f5ef', 0.3, 0, { transparent: true, opacity: 0.55, emissive: '#f3dcb8', emissiveIntensity: 0.18 }));
     shade.position.set(0, 2.34, 0.5); this.stage.add(shade);
     // 左の壁の窓（型板ガラスの引き違い窓）
     const frame = this.mat('#b8bcbf', 0.35, 0.6);
-    this.plane(0.72, 0.92, x0 + 0.012, 1.45, 1.15, this.mat('#ffffff', 0.3, 0, { map: TX.frosted(), emissive: '#e9f2f5', emissiveIntensity: 0.55 }), Math.PI / 2);
+    this.plane(0.72, 0.92, x0 + 0.012, 1.45, 1.15, this.mat('#ffffff', 0.3, 0, { map: TX.frosted(), color: '#6f8196', emissive: '#2c3b4d', emissiveIntensity: 0.6 }), Math.PI / 2);
     this.box(0.04, 0.04, 0.8, x0 + 0.02, 1.93, 1.15, frame, { phys: false });
     this.box(0.04, 0.04, 0.8, x0 + 0.02, 0.97, 1.15, frame, { phys: false });
     this.box(0.04, 0.96, 0.04, x0 + 0.02, 1.45, 0.77, frame, { phys: false });
@@ -336,7 +312,7 @@ export class World {
     // 手元灯
     this.box(0.9, 0.025, 0.05, -0.55, 1.487, B + 0.25, this.mat('#ffffff', 0.4, 0, { emissive: '#fffaf0', emissiveIntensity: 1.2 }), { phys: false });
     // レンジフード
-    const hoodMat = this.mat('#ecebe6', 0.35, 0.2);
+    const hoodMat = this.mat('#cfccc3', 0.45, 0.2);
     this.box(0.9, 0.6, 0.5, 0.75, 2.1, B + 0.25, hoodMat, { surface: 'steel' });
     this.box(0.9, 0.06, 0.5, 0.75, 1.77, B + 0.25, this.mat('#d6d4ce', 0.4, 0.3), { surface: 'steel' });
     // マット
@@ -954,6 +930,7 @@ export class World {
     this.debrisSolid.flush(); this.debrisGlass.flush();
 
     this._updateTrails(dt);
+    this._updateFlicker(dt);
 
     // 缶が転がる音
     for (const b of this.cans) {

@@ -31,6 +31,7 @@ html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;overflow:hidden;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 #view{position:fixed;inset:0;width:100%;height:100%;display:block}
 #touch{position:fixed;inset:0;touch-action:none}
+#vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 85% 70% at 50% 48%,rgba(0,0,0,0) 55%,rgba(0,0,0,.55) 100%)}
 button{font-family:var(--f-body);color:var(--ink);cursor:pointer}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
@@ -116,6 +117,7 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 </svg>
 
 <canvas id="view"></canvas>
+<div id="vignette"></div>
 <div id="touch"></div>
 
 <div id="hud" hidden>
@@ -141,8 +143,7 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
     <p class="eyebrow">DEMO v0.1</p>
     <h1>ぶん投げ<br>部屋</h1>
     <p class="lead">投げて、壊して、片付けない。</p>
-    <button id="stageKitchen" class="stage-card" type="button"><b>キッチン</b><span>ちょっと古いマンションの台所</span></button>
-    <button id="stageReal" class="stage-card" type="button"><b>キッチン（写真）</b><span id="realNote">同じ台所を写真風にした試作版。最初の読み込みに少し時間がかかります</span></button>
+    <button id="stageKitchen" class="stage-card" type="button"><b>キッチン</b><span>夜、ちょっと古いマンションの台所</span></button>
     <p class="soon">ほかのステージは準備中です</p>
     <p class="safety">スマホは手から離さずに、しっかり握ったまま振ってください。まわりに人や物がないか確かめてから。</p>
   </div>
@@ -183,6 +184,6 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 <div id="fade"></div>
 <div id="rotate">縦向きで遊んでください</div>
 
-<script type="module" src="./js/main.js?v=202609291707"></script>
+<script type="module" src="./js/main.js?v=202609291717"></script>
 </body>
 </html>
