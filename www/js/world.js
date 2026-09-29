@@ -2,9 +2,10 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291815';
-import { sfx } from './audio.js?v=202609291815';
-import { haptics } from './haptics.js?v=202609291815';
+import * as TX from './textures.js?v=202609291834';
+import { sfx } from './audio.js?v=202609291834';
+import { GiantVase } from './vase.js?v=202609291834';
+import { haptics } from './haptics.js?v=202609291834';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -34,7 +35,8 @@ class Debris {
     for (let i = 0; i < p.count; i++) {
       v.fromBufferAttribute(p, i).applyMatrix4(m); this.pos.push(v.x, v.y, v.z);
       v.fromBufferAttribute(n, i).applyMatrix3(nm).normalize(); this.nor.push(v.x, v.y, v.z);
-      this.col.push(c.r, c.g, c.b);
+      if (g.attributes.color) this.col.push(g.attributes.color.getX(i), g.attributes.color.getY(i), g.attributes.color.getZ(i));
+      else this.col.push(c.r, c.g, c.b);
     }
     this.dirty = true;
   }
@@ -114,7 +116,7 @@ export class World {
   // 夜。天井の蛍光灯は弱く、ときどきちらつく。手元灯だけが少し明るい。窓の外は暗い青
   _lights() {
     const s = this.scene;
-    s.add(new THREE.HemisphereLight('#9aa3a8', '#2a241e', 0.16));
+    this.hemi = new THREE.HemisphereLight('#9aa3a8', '#2a241e', 0.16); s.add(this.hemi);
     const ceil = this.ceilLight = new THREE.PointLight('#ffe7c2', 2.0, 0, 2); ceil.position.set(0, 2.25, 0.5); s.add(ceil);
     const d = this.sun = new THREE.DirectionalLight('#ffdcae', 0.55);
     d.position.set(0.3, 2.35, 0.6); d.target.position.set(0, 0.4, -0.6);
@@ -123,12 +125,13 @@ export class World {
     d.shadow.bias = -0.0008; d.shadow.normalBias = 0.02;
     s.add(d, d.target);
     const under = this.underLight = new THREE.PointLight('#e9f3de', 1.6, 2.4, 2); under.position.set(-0.55, 1.45, -0.7); s.add(under);
-    const win = new THREE.PointLight('#5f7894', 0.9, 3.2, 2); win.position.set(-1.95, 1.5, 1.15); s.add(win);
+    const win = this.winLight = new THREE.PointLight('#5f7894', 0.9, 3.2, 2); win.position.set(-1.95, 1.5, 1.15); s.add(win);
   }
 
   // 明るさ（写真のステージは写真に合わせて明るめ）
   _setLightLevel(k) {
     this.ceilLight.intensity = 2.0 * k; this.sun.intensity = 0.55 * k; this.underLight.intensity = 1.6 * k;
+    this.winLight.intensity = 0.9 * k; this.hemi.intensity = k > 0 ? 0.16 : 0.07;
     if (this.lampMat) this.lampMat.emissiveIntensity = 0.9;
   }
 
@@ -167,8 +170,10 @@ export class World {
     this.lampBroken = false; this.windowState = 0;
     this.statics = [];
     this.fridgeFront = null;
-    this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items();
-    this._setLightLevel(1);
+    this.vases = [];
+    if (this.stageType === 'warehouse') this._warehouse();
+    else { this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items(); }
+    this._setLightLevel(this.stageType === 'warehouse' ? 0 : 1);
     this.resize(this._w || 1, this._h || 1);
     // 写真の明るさに3Dの小物を少し寄せる
     this.renderer.toneMappingExposure = 0.8;
@@ -215,6 +220,47 @@ export class World {
   }
 
   _recOf(body) { return this.dyn.find(r => r.body === body); }
+
+  // ================ 倉庫と巨大な壺 =================
+  _warehouse() {
+    const X = 7, Z0 = -8, Z1 = 4, Hh = 6, W = X * 2, D = Z1 - Z0, T = 1.0;
+    const floorMat = this.mat('#ffffff', 0.85, 0, { map: TX.concreteFloor(W / 2, D / 2) });
+    this.box(W, 0.1, D, 0, -0.05, (Z0 + Z1) / 2, floorMat, { surface: 'floor', pd: [W + 2, T, D + 2], pp: [0, -T / 2, (Z0 + Z1) / 2] });
+    const wall = (rx, ry) => this.mat('#ffffff', 0.9, 0, { map: TX.concreteWall(rx, ry) });
+    this.box(W, Hh, 0.1, 0, Hh / 2, Z0 - 0.05, wall(W / 1.8, Hh / 0.9), { surface: 'wall', pd: [W + 2, Hh + 2, T], pp: [0, Hh / 2, Z0 - T / 2] });
+    this.box(W, Hh, 0.1, 0, Hh / 2, Z1 + 0.05, wall(W / 1.8, Hh / 0.9), { surface: 'wall', pd: [W + 2, Hh + 2, T], pp: [0, Hh / 2, Z1 + T / 2] });
+    this.box(0.1, Hh, D, -X - 0.05, Hh / 2, (Z0 + Z1) / 2, wall(D / 1.8, Hh / 0.9), { surface: 'wall', pd: [T, Hh + 2, D + 2], pp: [-X - T / 2, Hh / 2, (Z0 + Z1) / 2] });
+    this.box(0.1, Hh, D, X + 0.05, Hh / 2, (Z0 + Z1) / 2, wall(D / 1.8, Hh / 0.9), { surface: 'wall', pd: [T, Hh + 2, D + 2], pp: [X + T / 2, Hh / 2, (Z0 + Z1) / 2] });
+    this.box(W, 0.1, D, 0, Hh + 0.05, (Z0 + Z1) / 2, this.mat('#3a3a38', 0.95), { surface: 'wall', pd: [W + 2, T, D + 2], pp: [0, Hh + T / 2, (Z0 + Z1) / 2] });
+    // 天井の梁と、遠くの蛍光灯
+    for (let z = Z0 + 1.5; z < Z1; z += 3) this.box(W, 0.35, 0.25, 0, Hh - 0.18, z, this.mat('#2e2e2c', 0.8), { phys: false });
+    for (const [x, z] of [[-3.5, -6], [3.5, -6], [-3.5, 0.5], [3.5, 0.5]]) {
+      this.box(1.2, 0.05, 0.12, x, Hh - 0.4, z, this.mat('#ffffff', 0.4, 0, { emissive: '#dfe9f2', emissiveIntensity: 0.9 }), { phys: false });
+      const l = new THREE.PointLight('#cfdbe6', 1.2, 7, 2); l.position.set(x, Hh - 0.5, z); this.stage.add(l);
+    }
+    // 壺を照らすスポットライト
+    const center = this.vaseCenter = new THREE.Vector3(0, 0.14, -2.4);
+    const spot = new THREE.SpotLight('#fff0d8', 90, 14, 0.42, 0.55, 2);
+    spot.position.set(0.9, 6.2, -0.8); spot.target.position.set(0, 1.1, -2.4);
+    spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024); spot.shadow.bias = -0.0006; spot.shadow.normalBias = 0.02;
+    this.stage.add(spot, spot.target);
+    const fill = new THREE.PointLight('#8fa2bb', 5, 10, 2); fill.position.set(0, 3.2, 2.6); this.stage.add(fill);
+    // 台（パレット）と区画線
+    const wood = this.mat('#9c7a52', 0.8);
+    this.box(1.4, 0.14, 1.4, center.x, 0.07, center.z, wood, { surface: 'wood' });
+    const tape = this.mat('#ffffff', 0.7, 0, { map: TX.hazard() });
+    const s = 1.6;
+    [[0, -s, 0], [0, s, 0], [-s, 0, Math.PI / 2], [s, 0, Math.PI / 2]].forEach(([dx, dz, r]) => {
+      const m = this.plane(3.3, 0.12, center.x + dx, 0.003, center.z + dz, tape, r, -Math.PI / 2); m.receiveShadow = true;
+    });
+    // 脇の積まれたパレットとドラム缶
+    for (let k = 0; k < 4; k++) this.box(1.2, 0.14, 1.0, -4.6, 0.07 + k * 0.15, -3.5 + (k % 2) * 0.05, wood, { surface: 'wood', cast: true });
+    [['#2f5d8a', 4.3, -3.2], ['#8a2f2f', 4.9, -2.6], ['#2f5d8a', 4.6, -4.0]].forEach(([c, x, z]) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.88, 24), this.mat(c, 0.5, 0.4)); m.position.set(x, 0.44, z); m.castShadow = m.receiveShadow = true; this.stage.add(m);
+      const b = new CANNON.Body({ mass: 0 }); b.addShape(new CANNON.Cylinder(0.29, 0.29, 0.88, 12)); b.position.set(x, 0.44, z); b.ud = { static: true, surface: 'steel' }; this.physics.addBody(b);
+    });
+    this.vases.push(new GiantVase(this, center));
+  }
 
   _room() {
     const { x0, x1, z0, z1, h } = ROOM;
@@ -764,6 +810,11 @@ export class World {
         sfx.metal(v * Math.min(1, b.mass * 2.5));
       }
       const solid = ud.kind !== 'shard' && ud.kind !== 'shell';
+      // 巨大な壺に当たった
+      if (oud.vase && solid && v > 1.5 && (ud.thrown || ud.kind === 'vasePiece') && (ud.vaseHits || 0) < 2) {
+        ud.vaseHits = (ud.vaseHits || 0) + 1;
+        const vs = oud.vase; if (vs.pieces[oud.idx].attached) vs.hit(oud.idx, e.point, v, b.mass, e.normal.clone().negate(), ud.kind);
+      }
       // 窓ガラス・天井の照明
       if (oud.surface === 'window' && solid && v > 2) this._hitWindow(e.point, e.normal, v);
       if (oud.surface === 'lamp' && solid && v > 1.8) this._breakLamp();
@@ -774,7 +825,7 @@ export class World {
         sfx.glass(0.25);
       }
       // 当たった所に傷（投げた物、または重い物が勢いよく当たったとき）
-      if (oud.static && oud.surface !== 'window' && oud.surface !== 'lamp' && v > 2.5 && ud.kind !== 'egg' && solid && (ud.scuffs || 0) < 4 && (ud.thrown || b.mass >= 0.5)) {
+      if (oud.static && oud.surface !== 'window' && oud.surface !== 'lamp' && oud.surface !== 'vase' && ud.kind !== 'vasePiece' && v > 2.5 && ud.kind !== 'egg' && solid && (ud.scuffs || 0) < 4 && (ud.thrown || b.mass >= 0.5)) {
         ud.scuffs = (ud.scuffs || 0) + 1;
         this._scuff(e.point, e.normal, e.other, v, b.mass);
       }
@@ -785,6 +836,12 @@ export class World {
         case 'can':
           if (v > 0.5) sfx.can(v);
           if (v > 2.6) this._dentCan(b, e.point, v);
+          break;
+        case 'vasePiece':
+          if (v > 2.2 && oud.static && !oud.vase) {
+            sfx.ceramic(clamp(v / 14, 0.15, 0.5));
+            if (v > 3.5 && Math.random() < 0.6) for (let i = 0; i < 3; i++) this._shard(e.point.clone().addScaledVector(e.normal, 0.02), new THREE.Vector3(rand(-1, 1), rand(0.5, 1.5), rand(-1, 1)), rand(0.01, 0.025), 0.006, new THREE.Color(Math.random() < 0.5 ? '#eceee8' : '#cdb592'), false);
+          }
           break;
         case 'clock':
           if (!ud.cracked && v > 1.2) {
@@ -881,7 +938,7 @@ export class World {
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal.clone().normalize());
     m.quaternion.copy(q); m.rotateZ(rand(0, Math.PI * 2));
     m.position.copy(point).addScaledVector(normal, 0.003);
-    const target = oud.static ? this.stage : (oud.mesh || this.stage);
+    const target = oud.vase ? oud.vase.pieces[oud.idx].mesh : (oud.static ? this.stage : (oud.mesh || this.stage));
     this.stage.add(m); m.updateMatrixWorld(true);
     if (target !== this.stage) target.attach(m);
     this.splats.push(m);
@@ -1077,9 +1134,23 @@ export class World {
     this.physics.step(1 / 120, dt, 8);
     this._processEvents();
 
+    const tq = this._tq || (this._tq = new THREE.Quaternion());
     for (const r of this.dyn) {
-      r.mesh.position.copy(r.body.position); r.mesh.quaternion.copy(r.body.quaternion);
+      if (r.off) {
+        tq.set(r.body.quaternion.x, r.body.quaternion.y, r.body.quaternion.z, r.body.quaternion.w);
+        r.mesh.quaternion.copy(tq).multiply(r.meshQuat);
+        r.mesh.position.copy(r.off).applyQuaternion(tq).add(r.body.position);
+      } else { r.mesh.position.copy(r.body.position); r.mesh.quaternion.copy(r.body.quaternion); }
     }
+    // 壺：全体の9割近く割れたら、残りを崩して次の壺を落とす
+    for (const v of this.vases) v.update(dt);
+    const cur = this.vases[this.vases.length - 1];
+    if (cur && cur.done && !cur.drop && this.clock - cur.lastHit > 2.2) {
+      for (const p of cur.pieces) if (p.attached) cur._detach(p, new THREE.Vector3(rand(-0.4, 0.4), 0, rand(-0.4, 0.4)));
+      cur.lastHit = Infinity;
+      setTimeout(() => { if (this.vases.includes(cur)) this.vases.push(new GiantVase(this, this.vaseCenter, { drop: true })); }, 1800);
+    }
+    this.vases = this.vases.filter((v, i) => i === this.vases.length - 1 || v.pieces.some(p => p.dyn));
 
     // 破片が落ち着いたらまとめ描画へ
     for (const b of [...this.shards]) {

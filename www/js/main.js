@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609291815';
-import { SwingDetector } from './motion.js?v=202609291815';
-import { sfx } from './audio.js?v=202609291815';
-import { haptics, hapticSettings } from './haptics.js?v=202609291815';
+import { World } from './world.js?v=202609291834';
+import { SwingDetector } from './motion.js?v=202609291834';
+import { sfx } from './audio.js?v=202609291834';
+import { haptics, hapticSettings } from './haptics.js?v=202609291834';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -40,10 +40,11 @@ async function enterStage(type) {
   sfx.unlock();
   if (!permAsked) { permAsked = true; await det.requestPermission(); det.start(); }
   world.reset(type);
-  world.yaw = 0; world.pitch = -0.12;
+  world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : -0.12;
   show('item');
 }
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));
+$('#stageWarehouse').addEventListener('click', () => enterStage('warehouse'));
 
 document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {
   sfx.unlock();

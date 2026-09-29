@@ -332,3 +332,32 @@ export const dot = () => make('dot', 64, 64, (g, w, h) => {
   rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(.5, 'rgba(255,255,255,.45)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = rg; g.fillRect(0, 0, w, h);
 });
+
+// 倉庫：コンクリートの床（しみ・ひび）1枚で2m角
+export const concreteFloor = (rx, ry) => make('cfloor', 512, 512, (g, w, h) => {
+  g.fillStyle = '#6b6a66'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++) { const x = rnd() * w, y = rnd() * h, r = 30 + rnd() * 120; const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, `rgba(${rnd() < .6 ? '20,18,15' : '255,255,255'},${.04 + rnd() * .08})`); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  noise(g, w, h, 16000, .09);
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, w, 2); g.fillRect(0, 0, 2, h);
+  crack(g, rnd() * w, rnd() * h, 3, 180, 'rgba(30,28,25,.35)', 1);
+}, { repeat: [rx, ry] });
+
+// 倉庫：打ちっぱなしの壁（型枠の継ぎ目とPコン跡）1枚で1.8m×0.9m
+export const concreteWall = (rx, ry) => make('cwall', 512, 256, (g, w, h) => {
+  g.fillStyle = '#7d7c77'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 12; i++) { const x = rnd() * w, y = rnd() * h, r = 20 + rnd() * 90; const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, `rgba(${rnd() < .5 ? '0,0,0' : '255,255,255'},${.04 + rnd() * .05})`); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  noise(g, w, h, 9000, .08);
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(0, 0, w, 2); g.fillRect(0, 0, 2, h);
+  for (const [fx, fy] of [[.25, .25], [.75, .25], [.25, .75], [.75, .75]]) {
+    const cx = w * fx, cy = h * fy; const rg = g.createRadialGradient(cx - 1, cy - 1, 0, cx, cy, 9);
+    rg.addColorStop(0, 'rgba(25,25,25,.8)'); rg.addColorStop(.6, 'rgba(50,50,50,.5)'); rg.addColorStop(.8, 'rgba(255,255,255,.15)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = rg; g.beginPath(); g.arc(cx, cy, 9, 0, 7); g.fill();
+  }
+}, { repeat: [rx, ry] });
+
+// 床の黄色と黒の区画線
+export const hazard = () => make('hazard', 256, 32, (g, w, h) => {
+  g.fillStyle = '#e0b21e'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#1b1b1b'; for (let x = -h; x < w + h; x += h * 1.4) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + h * .7, h); g.lineTo(x + h * 1.4, 0); g.lineTo(x + h * .7, 0); g.closePath(); g.fill(); }
+  noise(g, w, h, 900, .25);
+}, { repeat: [6, 1] });
