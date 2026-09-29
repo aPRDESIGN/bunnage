@@ -254,3 +254,81 @@ export const scuff = (kind, i) => make('scuff_' + kind + i, 128, 128, (g, w, h) 
     g.fillStyle = 'rgba(40,30,20,.5)'; g.beginPath(); g.ellipse(cx, cy, 5, 3.5, ang, 0, 7); g.fill();
   }
 }, { });
+
+// 壁に空いた穴（強く当たったとき）
+export const hole = (i) => make('hole' + i, 128, 128, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2;
+  // 周りの破れた壁紙とへこみ
+  const rg = g.createRadialGradient(cx, cy, 8, cx, cy, 58);
+  rg.addColorStop(0, 'rgba(60,50,40,.7)'); rg.addColorStop(.55, 'rgba(90,78,64,.3)'); rg.addColorStop(1, 'rgba(90,78,64,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, w, h);
+  const pts = []; for (let a = 0; a < 14; a++) { const ang = a / 14 * 6.283, r = 16 + rnd() * 14; pts.push([cx + Math.cos(ang) * r, cy + Math.sin(ang) * r * .85]); }
+  g.fillStyle = 'rgba(250,246,236,.95)'; g.beginPath(); pts.forEach((p, k) => { const q = [cx + (p[0] - cx) * 1.35, cy + (p[1] - cy) * 1.35]; k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(214,206,190,1)'; g.beginPath(); pts.forEach((p, k) => { const q = [cx + (p[0] - cx) * 1.12, cy + (p[1] - cy) * 1.12]; k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(22,18,15,1)'; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fill();
+  crack(g, cx, cy, 7, 60, 'rgba(50,42,34,.7)', 1.4);
+});
+
+// ガラスのひび（窓・レンジ・時計）
+export const glassCrack = (i) => make('gcrack' + i, 256, 256, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2;
+  g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.3;
+  const rays = 11 + Math.floor(rnd() * 5), ends = [];
+  for (let k = 0; k < rays; k++) {
+    let a = k / rays * 6.283 + rnd() * .3, x = cx, y = cy; const L = 70 + rnd() * 55; g.beginPath(); g.moveTo(x, y);
+    const pts = [];
+    for (let s = 1; s <= 6; s++) { a += (rnd() - .5) * .25; x = cx + Math.cos(a) * L * s / 6; y = cy + Math.sin(a) * L * s / 6; g.lineTo(x, y); pts.push([x, y]); }
+    g.stroke(); ends.push(pts);
+  }
+  g.lineWidth = .9; g.strokeStyle = 'rgba(255,255,255,.6)';
+  for (let ring = 1; ring <= 4; ring++) {
+    g.beginPath();
+    ends.forEach((pts, k) => { const p = pts[Math.min(5, ring)]; k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); });
+    g.closePath(); g.stroke();
+  }
+  g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.arc(cx, cy, 6, 0, 7); g.fill();
+});
+
+// 掛け時計の文字盤
+export const clockFace = () => make('clock', 256, 256, (g, w, h) => {
+  const c = w / 2;
+  g.fillStyle = '#f6f3ea'; g.beginPath(); g.arc(c, c, c, 0, 7); g.fill();
+  g.fillStyle = '#222'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let n = 1; n <= 12; n++) { const a = n / 12 * 6.283 - 1.5708; g.fillText(String(n), c + Math.cos(a) * 96, c + Math.sin(a) * 96); }
+  g.strokeStyle = '#222'; g.lineCap = 'round';
+  const hand = (a, len, wd) => { g.lineWidth = wd; g.beginPath(); g.moveTo(c, c); g.lineTo(c + Math.cos(a - 1.5708) * len, c + Math.sin(a - 1.5708) * len); g.stroke(); };
+  hand(10.2 / 12 * 6.283, 55, 7); hand(0.25 * 6.283 * 0.8, 82, 4);
+  g.strokeStyle = '#c33'; hand(0.62 * 6.283, 88, 1.5);
+  g.fillStyle = '#222'; g.beginPath(); g.arc(c, c, 6, 0, 7); g.fill();
+}, { repeat: [1, 1] });
+
+// 割れた窓（型板ガラスに穴、穴の向こうは夜の外）
+export const windowBroken = () => make('winbroken', 256, 320, (g, w, h) => {
+  g.fillStyle = '#dfe8ea'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 900; i++) { const x = rnd() * w, y = rnd() * h, r = 1 + rnd() * 3; g.fillStyle = `rgba(255,255,255,${.2 + rnd() * .4})`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  const cx = w * (.4 + rnd() * .2), cy = h * (.4 + rnd() * .2);
+  g.fillStyle = '#0c1320'; g.beginPath();
+  for (let a = 0; a < 16; a++) { const ang = a / 16 * 6.283, r = (a % 2 ? 40 : 95) + rnd() * 40; const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r * 1.2; a ? g.lineTo(x, y) : g.moveTo(x, y); }
+  g.closePath(); g.fill();
+  crack(g, cx, cy, 14, 170, 'rgba(255,255,255,.8)', 1.2);
+});
+
+// こぼれた液体（しょうゆ・油など）
+export const liquid = (color) => make('liq' + color, 128, 128, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2;
+  g.fillStyle = color; g.globalAlpha = .85; g.beginPath();
+  for (let a = 0; a <= 30; a++) { const ang = a / 30 * 6.283, r = 34 + rnd() * 20 + (a % 6 === 0 ? 12 : 0); const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r; a ? g.lineTo(x, y) : g.moveTo(x, y); }
+  g.closePath(); g.fill();
+  for (let k = 0; k < 10; k++) { g.beginPath(); g.arc(cx + (rnd() - .5) * 110, cy + (rnd() - .5) * 110, 2 + rnd() * 5, 0, 7); g.fill(); }
+  g.globalAlpha = .35; g.fillStyle = '#fff'; g.beginPath(); g.ellipse(cx - 10, cy - 12, 14, 5, -.4, 0, 7); g.fill();
+});
+
+// 粉ぼこりの粒
+export const dot = () => make('dot', 64, 64, (g, w, h) => {
+  const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(.5, 'rgba(255,255,255,.45)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, w, h);
+});
