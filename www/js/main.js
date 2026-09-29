@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609291751';
-import { SwingDetector } from './motion.js?v=202609291751';
-import { sfx } from './audio.js?v=202609291751';
-import { haptics, hapticSettings } from './haptics.js?v=202609291751';
+import { World } from './world.js?v=202609291758';
+import { SwingDetector } from './motion.js?v=202609291758';
+import { sfx } from './audio.js?v=202609291758';
+import { haptics, hapticSettings } from './haptics.js?v=202609291758';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -39,21 +39,19 @@ function show(id) {
 async function enterStage(type) {
   sfx.unlock();
   if (!permAsked) { permAsked = true; await det.requestPermission(); det.start(); }
-  if (type === 'photo' && !world.photoTex) {
+  if (type === 'photo' && !world.photoFaces) {
     const note = $('#photoNote'), btn = $('#stagePhoto');
-    btn.disabled = true; note.textContent = '写真を読み込み中…';
+    btn.disabled = true;
     try {
-      [world.photoTex, world.photoItemsTex] = await Promise.all([
-        World.loadPhoto('./assets/real-kitchen/front120.jpg'),
-        World.loadPhoto('./assets/real-kitchen/front120_items.jpg').catch(() => null)
-      ]);
-      world.photoBounds = await fetch('./assets/real-kitchen/photo.json').then(r => r.json()).then(j => j.bounds).catch(() => null);
-    }
-    catch (e) { note.textContent = '写真を読み込めませんでした。もう一度押してください'; btn.disabled = false; return; }
-    btn.disabled = false; note.textContent = '正面だけ見られる、写真の台所（試作）';
+      const dir = './assets/real-kitchen/';
+      note.textContent = '写真を読み込み中… 0%';
+      world.photoFaces = await World.loadPhotos({ front: dir + 'front.jpg', left: dir + 'left.jpg', right: dir + 'right.jpg', up: dir + 'up.jpg', down: dir + 'down.jpg' },
+        (p) => { note.textContent = `写真を読み込み中… ${Math.round(p * 100)}%`; });
+    } catch (e) { note.textContent = '写真を読み込めませんでした。もう一度押してください'; btn.disabled = false; return; }
+    btn.disabled = false; note.textContent = '同じ台所を写真風にした試作版';
   }
   world.reset(type);
-  world.yaw = 0; world.pitch = type === 'photo' ? 0 : -0.12;
+  world.yaw = 0; world.pitch = -0.12;
   show('item');
 }
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));

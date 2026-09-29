@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291751';
-import { sfx } from './audio.js?v=202609291751';
-import { haptics } from './haptics.js?v=202609291751';
+import * as TX from './textures.js?v=202609291758';
+import { sfx } from './audio.js?v=202609291758';
+import { haptics } from './haptics.js?v=202609291758';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -13,8 +13,6 @@ const D2R = Math.PI / 180;
 // 部屋の寸法（m）
 const ROOM = { x0: -2.3, x1: 2.3, z0: -0.95, z1: 2.8, h: 2.4 };
 export const EYE = new THREE.Vector3(0, 1.52, 1.75);
-// 写真のステージの写真の画角（正面から上下左右それぞれ何度まで写っているか）
-const PHOTO_HALF = 60 * Math.PI / 180, PHOTO_TAN = Math.tan(60 * Math.PI / 180);
 const COUNTER_Y = 0.85, COUNTER_FRONT = -0.3;
 
 const LIMITS = { activeShards: 140, cans: 40, splats: 120 };
@@ -157,30 +155,10 @@ export class World {
 
   // 見回せる範囲（ラジアン）
   viewLimits() {
-    if (this.stageType !== 'photo') return { yaw: 90 * D2R, pitchMin: -65 * D2R, pitchMax: 50 * D2R };
-    return { yaw: 58 * D2R, pitchMin: -55 * D2R, pitchMax: 55 * D2R };
-  }
-  // 写真のステージ：画面の四隅がすべて写真（正面120°×120°）の中に収まるか
-  _viewOK(yaw, pitch) {
-    const e = new THREE.Euler(pitch, yaw, 0, 'YXZ');
-    const th = Math.tan(this.camera.fov / 2 * D2R), tw = th * this.camera.aspect;
-    for (const [cx, cy] of [[tw, th], [-tw, th], [tw, -th], [-tw, -th]]) {
-      const v = new THREE.Vector3(cx, cy, -1).applyEuler(e);
-      if (v.z >= 0) return false;
-      // 写真がきちんと写っている範囲（tan）。未指定なら画角いっぱい
-      const B = this.photoBounds || { l: -PHOTO_TAN, r: PHOTO_TAN, b: -PHOTO_TAN, t: PHOTO_TAN };
-      const x = v.x / -v.z, y = v.y / -v.z;
-      if (x < B.l * 0.985 || x > B.r * 0.985 || y < B.b * 0.985 || y > B.t * 0.985) return false;
-    }
-    return true;
+    return { yaw: 90 * D2R, pitchMin: -65 * D2R, pitchMax: 50 * D2R };
   }
   // 見たい向き → 実際に向ける向き（写真の外が見えそうなら、端に沿って止める）
-  clampView(yaw, pitch) {
-    if (this.stageType !== 'photo' || this._viewOK(yaw, pitch)) return [yaw, pitch];
-    if (this._viewOK(yaw, this.pitch)) return [yaw, this.pitch];
-    if (this._viewOK(this.yaw, pitch)) return [this.yaw, pitch];
-    return [this.yaw, this.pitch];
-  }
+  clampView(yaw, pitch) { return [yaw, pitch]; }
 
 
   // ================= ステージ構築 =================
@@ -237,105 +215,41 @@ export class World {
     this.stage.add(m); return m;
   }
 
-  // ---- 写真のキッチン（正面の1枚だけ） ----
-  // 目の位置から正面120°で撮った写真を、撮ったときと同じ向き・画角の板として置く。
-  // 3Dの部屋は影だけ見える透明な面にして、物理・影・傷・卵の跡の土台に使う。
-  static loadPhoto(url) {
-    return new Promise((res, rej) => {
-      const loader = new THREE.TextureLoader();
-      loader.load(url, (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; res(t); }, undefined, rej);
-    });
+  // ---- 写真のキッチン ----
+  // 目の位置から90°ずつ撮った5方向の写真を、撮ったときと同じ向き・画角の板として目の周りに並べる。
+  // 3Dの部屋は影だけ見える透明な面にして、物理・影・傷・卵の跡の土台として使う。小物は3Dのまま。
+  static async loadPhotos(urls, onProgress) {
+    const loader = new THREE.TextureLoader();
+    const keys = Object.keys(urls); let done = 0;
+    const out = {};
+    await Promise.all(keys.map(k => new Promise((res, rej) => loader.load(urls[k], (t) => {
+      t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; out[k] = t; done++; onProgress && onProgress(done / keys.length); res();
+    }, undefined, rej))));
+    return out;
   }
   _makePhoto() {
-    const clean = this.photoTex; if (!clean) return;
-    const items = this.photoItemsTex || clean;
-    const dynSet = new Set(this.dyn.map(r => r.mesh));
-    const shadowMat = this._shadowMat || (this._shadowMat = new THREE.ShadowMaterial({ opacity: 0.3 }));
+    const faces = this.photoFaces; if (!faces) return;
+    const dyn = new Set(this.dyn.map(r => r.mesh));
+    const shadowMat = this._shadowMat || (this._shadowMat = new THREE.ShadowMaterial({ opacity: 0.22 }));
     for (const o of [...this.stage.children]) {
-      if (!o.isMesh || dynSet.has(o)) continue;
+      if (!o.isMesh || dyn.has(o)) continue;
       o.material = shadowMat; o.castShadow = false; o.receiveShadow = true;
       o.traverse(c => { if (c !== o && c.isMesh) { c.material = shadowMat; c.castShadow = false; } });
     }
+    const sky = new THREE.Group(); sky.position.copy(EYE);
     const d = 6;
-    // 背景は「小物ありの写真」
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d * PHOTO_TAN, 2 * d * PHOTO_TAN), new THREE.MeshBasicMaterial({ map: items, depthTest: false, depthWrite: false, toneMapped: false }));
-    m.position.set(EYE.x, EYE.y, EYE.z - d); m.renderOrder = -10; m.frustumCulled = false;
-    this.stage.add(m);
-    if (!this.photoItemsTex) return;
-
-    // 写真を撮ったカメラ（目の位置・正面・120°）
-    const pc = this.photoCam || (this.photoCam = new THREE.PerspectiveCamera(120, 1, 0.01, 50));
-    pc.position.copy(EYE); pc.rotation.set(0, 0, 0); pc.updateMatrixWorld(); pc.updateProjectionMatrix();
-    this._photoPixels();
-    // 置いてある小物：止まっている間は隠して写真に任せる。見た目は写真から貼っておく
-    for (const rec of this.dyn) {
-      const root = rec.mesh;
-      root.updateMatrixWorld(true);
-      const b = rec.body;
-      rec.photo = { state: 'rest', pos: b.position.clone(), quat: b.quaternion.clone(), patch: null };
-      const patch = new THREE.Group();
-      root.traverse(o => {
-        if (!o.isMesh) return;
-        const g = o.geometry.clone();
-        const pos = g.attributes.position, uv = new Float32Array(pos.count * 2), v = new THREE.Vector3();
-        for (let i = 0; i < pos.count; i++) {
-          v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).project(pc);
-          uv[i * 2] = v.x * 0.5 + 0.5; uv[i * 2 + 1] = v.y * 0.5 + 0.5;
-        }
-        g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-        o.geometry = g;
-        o.material = new THREE.MeshBasicMaterial({ map: items, toneMapped: false, side: THREE.DoubleSide });
-        o.castShadow = false;
-        // 動いたあとに、元の場所を「小物なしの写真」で塗る板（少し大きく、縁はぼかす）
-        const pm = new THREE.Mesh(g, this._patchMaterial(clean));
-        pm.matrixAutoUpdate = false; pm.matrix.copy(o.matrixWorld); pm.frustumCulled = false; pm.renderOrder = -9;
-        patch.add(pm);
-      });
-      // 中心から少し膨らませる
-      const box = new THREE.Box3().setFromObject(root), c = box.getCenter(new THREE.Vector3());
-      const inflate = new THREE.Matrix4().makeTranslation(c.x, c.y, c.z).multiply(new THREE.Matrix4().makeScale(1.32, 1.25, 1.32)).multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
-      patch.children.forEach(pm => { pm.matrix.premultiply(inflate); pm.matrixWorldNeedsUpdate = true; });
-      rec.photo.patch = patch;
-      // 破片の色は写真のその場所の色に
-      const col = this._photoColorAt(c);
-      if (col) root.userData.color = col;
-      root.visible = false;
+    const dirs = { front: [0, 0], left: [Math.PI / 2, 0], right: [-Math.PI / 2, 0], up: [0, Math.PI / 2], down: [0, -Math.PI / 2] };
+    for (const [k, [yaw, pitch]] of Object.entries(dirs)) {
+      if (!faces[k]) continue;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d, 2 * d), new THREE.MeshBasicMaterial({ map: faces[k], depthTest: false, depthWrite: false, toneMapped: false }));
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
+      m.position.copy(new THREE.Vector3(0, 0, -d).applyQuaternion(q)); m.quaternion.copy(q);
+      m.renderOrder = -10; m.frustumCulled = false;
+      sky.add(m);
     }
-  }
-
-  _patchMaterial(tex) {
-    if (this._patchMat && this._patchMat.uniforms.map.value === tex) return this._patchMat;
-    this._patchMat = new THREE.ShaderMaterial({
-      uniforms: { map: { value: tex } },
-      transparent: false, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
-      vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV;
-        void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalMatrix * normal; vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
-      fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
-        void main(){ vec4 c = texture2D(map, vUv); gl_FragColor = vec4(c.rgb, 1.0);
-        #include <colorspace_fragment>
-        }`
-    });
-    return this._patchMat;
-  }
-
-  // 写真の画素を読めるようにしておく（破片の色に使う）
-  _photoPixels() {
-    if (this._pix || !this.photoItemsTex) return;
-    const img = this.photoItemsTex.image; const N = 512;
-    const c = document.createElement('canvas'); c.width = c.height = N;
-    const g = c.getContext('2d'); g.drawImage(img, 0, 0, N, N);
-    try { this._pix = { data: g.getImageData(0, 0, N, N).data, N }; } catch (e) { this._pix = null; }
-  }
-  _photoColorAt(worldPos) {
-    const px = this._pix; if (!px) return null;
-    const v = worldPos.clone().project(this.photoCam);
-    const x = Math.round((v.x * 0.5 + 0.5) * (px.N - 1)), y = Math.round((1 - (v.y * 0.5 + 0.5)) * (px.N - 1));
-    let r = 0, g = 0, b = 0, n = 0;
-    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-      const xx = Math.min(px.N - 1, Math.max(0, x + dx)), yy = Math.min(px.N - 1, Math.max(0, y + dy)), i = (yy * px.N + xx) * 4;
-      r += px.data[i]; g += px.data[i + 1]; b += px.data[i + 2]; n++;
-    }
-    return new THREE.Color().setRGB(r / n / 255, g / n / 255, b / n / 255, THREE.SRGBColorSpace);
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(2 * d, 2 * d), new THREE.MeshBasicMaterial({ color: '#bdb6aa', depthTest: false, depthWrite: false, toneMapped: false }));
+    back.position.set(0, 0, d); back.rotation.y = Math.PI; back.renderOrder = -11; sky.add(back);
+    this.stage.add(sky);
   }
 
   // 写真の小物を3Dに入れ替える（動いた・割れた・卵が付いた瞬間）
@@ -762,7 +676,6 @@ export class World {
     let yaw = yaw0 - sy;
     let pitch = clamp(pitch0 + sp + comp * Math.max(0, 1 + sp / (40 * D2R)), -85 * D2R, 70 * D2R);
     // 写真のステージでは、写真の範囲の外へは飛ばさない
-    if (this.stageType === 'photo') { yaw = clamp(yaw, -52 * D2R, 52 * D2R); pitch = clamp(pitch, -55 * D2R, 40 * D2R); }
     const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
 
     const world = new THREE.Vector3(); this.heldMesh.getWorldPosition(world);
