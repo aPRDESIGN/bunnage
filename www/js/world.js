@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291731';
-import { sfx } from './audio.js?v=202609291731';
-import { haptics } from './haptics.js?v=202609291731';
+import * as TX from './textures.js?v=202609291733';
+import { sfx } from './audio.js?v=202609291733';
+import { haptics } from './haptics.js?v=202609291733';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -247,8 +247,8 @@ export class World {
       o.traverse(c => { if (c !== o && c.isMesh) { c.material = shadowMat; c.castShadow = false; } });
     }
     const d = 6;
-    // 夜の雰囲気に合わせて写真を少し暗く
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d * PHOTO_TAN, 2 * d * PHOTO_TAN), new THREE.MeshBasicMaterial({ map: tex, color: '#8f8a82', depthTest: false, depthWrite: false, toneMapped: false }));
+    // 写真自体が夜なので、ほんの少しだけ暗く
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d * PHOTO_TAN, 2 * d * PHOTO_TAN), new THREE.MeshBasicMaterial({ map: tex, color: '#cfcac1', depthTest: false, depthWrite: false, toneMapped: false }));
     m.position.set(EYE.x, EYE.y, EYE.z - d); m.renderOrder = -10; m.frustumCulled = false;
     this.stage.add(m);
   }
