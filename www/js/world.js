@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291733';
-import { sfx } from './audio.js?v=202609291733';
-import { haptics } from './haptics.js?v=202609291733';
+import * as TX from './textures.js?v=202609291736';
+import { sfx } from './audio.js?v=202609291736';
+import { haptics } from './haptics.js?v=202609291736';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -127,10 +127,15 @@ export class World {
     s.add(d, d.target);
     const under = this.underLight = new THREE.PointLight('#e9f3de', 1.6, 2.4, 2); under.position.set(-0.55, 1.45, -0.7); s.add(under);
     const win = new THREE.PointLight('#5f7894', 0.9, 3.2, 2); win.position.set(-1.95, 1.5, 1.15); s.add(win);
-    this.flicker = { next: 4 + Math.random() * 6, t: 0, on: true };
   }
 
-  // 蛍光灯のちらつき
+  // 明るさ（写真のステージは写真に合わせて明るめ）
+  _setLightLevel(k) {
+    this.ceilLight.intensity = 2.0 * k; this.sun.intensity = 0.55 * k; this.underLight.intensity = 1.6 * k;
+    if (this.lampMat) this.lampMat.emissiveIntensity = 0.9;
+  }
+
+  // 蛍光灯のちらつき（今は使っていない）
   _updateFlicker(dt) {
     const f = this.flicker; if (!f) return;
     f.next -= dt;
@@ -183,6 +188,7 @@ export class World {
     this.fridgeFront = null;
     this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items();
     if (this.stageType === 'photo') this._makePhoto();
+    this._setLightLevel(this.stageType === 'photo' ? 1.8 : 1);
     this.resize(this._w || 1, this._h || 1);
     // 写真の明るさに3Dの小物を少し寄せる
     this.renderer.toneMappingExposure = 0.8;
@@ -248,7 +254,7 @@ export class World {
     }
     const d = 6;
     // 写真自体が夜なので、ほんの少しだけ暗く
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d * PHOTO_TAN, 2 * d * PHOTO_TAN), new THREE.MeshBasicMaterial({ map: tex, color: '#cfcac1', depthTest: false, depthWrite: false, toneMapped: false }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d * PHOTO_TAN, 2 * d * PHOTO_TAN), new THREE.MeshBasicMaterial({ map: tex, color: '#ffffff', depthTest: false, depthWrite: false, toneMapped: false }));
     m.position.set(EYE.x, EYE.y, EYE.z - d); m.renderOrder = -10; m.frustumCulled = false;
     this.stage.add(m);
   }
@@ -987,7 +993,6 @@ export class World {
     this.debrisSolid.flush(); this.debrisGlass.flush();
 
     this._updateTrails(dt);
-    this._updateFlicker(dt);
 
     // 缶が転がる音
     for (const b of this.cans) {
