@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291742';
-import { sfx } from './audio.js?v=202609291742';
-import { haptics } from './haptics.js?v=202609291742';
+import * as TX from './textures.js?v=202609291744';
+import { sfx } from './audio.js?v=202609291744';
+import { haptics } from './haptics.js?v=202609291744';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1077,7 +1077,7 @@ export class World {
     for (const r of this.dyn) {
       r.mesh.position.copy(r.body.position); r.mesh.quaternion.copy(r.body.quaternion);
       const ph = r.photo;
-      if (ph && ph.state === 'rest' && (r.body.position.distanceTo(ph.pos) > 0.004 || Math.abs(r.body.quaternion.dot(ph.quat)) < 0.9998)) this._wake(r);
+      if (ph && ph.state === 'rest' && (r.body.position.distanceTo(ph.pos) > 0.004 || Math.abs(r.body.quaternion.x * ph.quat.x + r.body.quaternion.y * ph.quat.y + r.body.quaternion.z * ph.quat.z + r.body.quaternion.w * ph.quat.w) < 0.9998)) this._wake(r);
     }
 
     // 破片が落ち着いたらまとめ描画へ
