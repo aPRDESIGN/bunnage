@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291717';
-import { sfx } from './audio.js?v=202609291717';
-import { haptics } from './haptics.js?v=202609291717';
+import * as TX from './textures.js?v=202609291721';
+import { sfx } from './audio.js?v=202609291721';
+import { haptics } from './haptics.js?v=202609291721';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -140,11 +140,22 @@ export class World {
   }
 
   resize(w, h) {
+    this._w = w; this._h = h;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
-    // 縦長画面でも左右が狭くなりすぎないように
-    this.camera.fov = w < h ? 74 : 60;
+    // 縦長画面でも左右が狭くなりすぎないように。写真のステージは写真の外が見えないよう少し狭く
+    this.camera.fov = this.stageType === 'photo' ? (w < h ? 62 : 48) : (w < h ? 74 : 60);
     this.camera.updateProjectionMatrix();
+  }
+
+  // 見回せる範囲（ラジアン）。写真のステージは写真（正面90°×90°）の端が画面に入らない範囲だけ
+  viewLimits() {
+    if (this.stageType !== 'photo') return { yaw: 90 * D2R, pitchMin: -65 * D2R, pitchMax: 50 * D2R };
+    const vHalf = this.camera.fov / 2 * D2R;
+    const hHalf = Math.atan(Math.tan(vHalf) * this.camera.aspect);
+    const edge = 45 * D2R - 1 * D2R;
+    // 斜めを向くと四隅が先に写真の外に出るので、少し余裕をとる
+    return { yaw: Math.max(0, edge - hHalf) * 0.85, pitchMin: -Math.max(0, edge - vHalf) * 0.85, pitchMax: Math.max(0, edge - vHalf) * 0.85 };
   }
 
   // ================= ステージ構築 =================
@@ -154,6 +165,8 @@ export class World {
     this.statics = [];
     this.fridgeFront = null;
     this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items();
+    if (this.stageType === 'photo') this._makePhoto();
+    this.resize(this._w || 1, this._h || 1);
     // 写真の明るさに3Dの小物を少し寄せる
     this.renderer.toneMappingExposure = 0.8;
     this._wakeGuard = this.clock + 0.3;
@@ -196,6 +209,31 @@ export class World {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
     m.position.set(x, y, z); m.rotation.set(rotX, rotY, 0, 'YXZ'); m.receiveShadow = true;
     this.stage.add(m); return m;
+  }
+
+  // ---- 写真のキッチン（正面の1枚だけ） ----
+  // 目の位置から正面90°で撮った写真を、撮ったときと同じ向き・画角の板として置く。
+  // 3Dの部屋は影だけ見える透明な面にして、物理・影・傷・卵の跡の土台に使う。
+  static loadPhoto(url) {
+    return new Promise((res, rej) => {
+      const loader = new THREE.TextureLoader();
+      loader.load(url, (t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; res(t); }, undefined, rej);
+    });
+  }
+  _makePhoto() {
+    const tex = this.photoTex; if (!tex) return;
+    const dyn = new Set(this.dyn.map(r => r.mesh));
+    const shadowMat = this._shadowMat || (this._shadowMat = new THREE.ShadowMaterial({ opacity: 0.3 }));
+    for (const o of [...this.stage.children]) {
+      if (!o.isMesh || dyn.has(o)) continue;
+      o.material = shadowMat; o.castShadow = false; o.receiveShadow = true;
+      o.traverse(c => { if (c !== o && c.isMesh) { c.material = shadowMat; c.castShadow = false; } });
+    }
+    const d = 6;
+    // 夜の雰囲気に合わせて写真を少し暗く
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d, 2 * d), new THREE.MeshBasicMaterial({ map: tex, color: '#8f8a82', depthTest: false, depthWrite: false, toneMapped: false }));
+    m.position.set(EYE.x, EYE.y, EYE.z - d); m.renderOrder = -10; m.frustumCulled = false;
+    this.stage.add(m);
   }
 
   _room() {
@@ -609,8 +647,10 @@ export class World {
     const handPos = new THREE.Vector3(); this.heldMesh.getWorldPosition(handPos);
     const aim = cam.position.clone().addScaledVector(look, dist).sub(handPos).normalize();
     const yaw0 = Math.atan2(-aim.x, -aim.z), pitch0 = Math.asin(clamp(aim.y, -1, 1));
-    const yaw = yaw0 - sy;
-    const pitch = clamp(pitch0 + sp + comp * Math.max(0, 1 + sp / (40 * D2R)), -85 * D2R, 70 * D2R);
+    let yaw = yaw0 - sy;
+    let pitch = clamp(pitch0 + sp + comp * Math.max(0, 1 + sp / (40 * D2R)), -85 * D2R, 70 * D2R);
+    // 写真のステージでは、写真の範囲の外へは飛ばさない
+    if (this.stageType === 'photo') { yaw = clamp(yaw, -38 * D2R, 38 * D2R); pitch = clamp(pitch, -40 * D2R, 30 * D2R); }
     const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
 
     const world = new THREE.Vector3(); this.heldMesh.getWorldPosition(world);

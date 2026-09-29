@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609291717';
-import { SwingDetector } from './motion.js?v=202609291717';
-import { sfx } from './audio.js?v=202609291717';
-import { haptics, hapticSettings } from './haptics.js?v=202609291717';
+import { World } from './world.js?v=202609291721';
+import { SwingDetector } from './motion.js?v=202609291721';
+import { sfx } from './audio.js?v=202609291721';
+import { haptics, hapticSettings } from './haptics.js?v=202609291721';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -39,11 +39,19 @@ function show(id) {
 async function enterStage(type) {
   sfx.unlock();
   if (!permAsked) { permAsked = true; await det.requestPermission(); det.start(); }
+  if (type === 'photo' && !world.photoTex) {
+    const note = $('#photoNote'), btn = $('#stagePhoto');
+    btn.disabled = true; note.textContent = '写真を読み込み中…';
+    try { world.photoTex = await World.loadPhoto('./assets/real-kitchen/front.jpg'); }
+    catch (e) { note.textContent = '写真を読み込めませんでした。もう一度押してください'; btn.disabled = false; return; }
+    btn.disabled = false; note.textContent = '正面だけ見られる、写真の台所（試作）';
+  }
   world.reset(type);
   world.yaw = 0; world.pitch = -0.12;
   show('item');
 }
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));
+$('#stagePhoto').addEventListener('click', () => enterStage('photo'));
 
 document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {
   sfx.unlock();
@@ -130,8 +138,9 @@ touch.addEventListener('pointermove', (e) => {
   if (ptr.kind === 'pending' && Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) > MOVE_TOL) { clearTimeout(ptr.timer); ptr.kind = 'cam'; }
   if (ptr.kind === 'cam') {
     if (camLocked()) return;
-    world.yaw = clamp(world.yaw + dx * 0.0048, -90 * D2R, 90 * D2R);
-    world.pitch = clamp(world.pitch + dy * 0.0048, -65 * D2R, 50 * D2R);
+    const L = world.viewLimits();
+    world.yaw = clamp(world.yaw + dx * 0.0048, -L.yaw, L.yaw);
+    world.pitch = clamp(world.pitch + dy * 0.0048, L.pitchMin, L.pitchMax);
   } else if (ptr.kind === 'hold' && !det.hasMotion && det.armed) {
     // センサーなしのテスト用：払う速さのピークを過ぎたら投げる
     ptr.hist.push([e.clientX, e.clientY, now]);
