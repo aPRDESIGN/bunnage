@@ -697,6 +697,11 @@ export class World {
         this._dentFridge(e.point, v, b.mass);
         sfx.metal(v * Math.min(1, b.mass * 2.5));
       }
+      // 当たった所に傷（投げた物、または重い物が勢いよく当たったとき）
+      if (oud.static && v > 3 && ud.kind !== 'egg' && ud.kind !== 'shard' && ud.kind !== 'shell' && (ud.scuffs || 0) < 3 && (ud.thrown || b.mass >= 0.5)) {
+        ud.scuffs = (ud.scuffs || 0) + 1;
+        this._scuff(e.point, e.normal, e.other, v, b.mass);
+      }
       switch (ud.kind) {
         case 'egg':
           if (v > 0.5) { ud.dead = true; this._splat(e.point, e.normal, e.other, v); this._remove(b); }
@@ -818,6 +823,37 @@ export class World {
     }
     sfx.egg(clamp(v / 9, 0.3, 1));
     this._breakHaptic();
+  }
+
+  // 面に貼るデカール（卵の跡・傷の共通）
+  _decal(point, normal, tex, size, other, offset = 0.003) {
+    const oud = (other && other.ud) || {};
+    const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 0.7, metalness: 0, polygonOffset: true, polygonOffsetFactor: -4 });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal.clone().normalize());
+    m.rotateZ(rand(0, Math.PI * 2));
+    m.position.copy(point).addScaledVector(normal, offset);
+    this.stage.add(m); m.updateMatrixWorld(true);
+    if (!oud.static && oud.mesh) oud.mesh.attach(m);
+    this.splats.push(m);
+    while (this.splats.length > LIMITS.splats) { const o = this.splats.shift(); o.parent && o.parent.remove(o); o.geometry.dispose(); o.material.dispose(); }
+    return m;
+  }
+
+  // 当たった面の材質に合わせて傷を残す
+  _scuff(point, normal, other, v, mass) {
+    const oud = other.ud || {};
+    if (!oud.static) return;
+    let kind = oud.surface || 'wall';
+    if (kind === 'fridge') kind = 'steel';
+    if (kind === 'plastic') kind = 'wood';
+    // 奥の壁のタイル部分
+    if (kind === 'wall' && normal.z > 0.7 && point.z < -0.9 && point.y > 0.85 && point.y < 1.75 && point.x > -1.35 && point.x < 1.25) kind = 'tile';
+    const strength = Math.min(1, (v - 2.5) / 8) * Math.min(1.5, Math.sqrt(mass / 0.3));
+    if (strength <= 0.05) return;
+    const size = (kind === 'tile' ? 0.16 : kind === 'floor' ? 0.17 : 0.12) * (0.75 + strength * 0.6);
+    const d = this._decal(point, normal, TX.scuff(kind === 'floor' ? 'floor' : kind, Math.floor(Math.random() * 3)), size, other, 0.0025);
+    d.material.opacity = 0.55 + strength * 0.45;
   }
 
   _breakHaptic() {

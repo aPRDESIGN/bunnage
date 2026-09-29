@@ -197,3 +197,60 @@ export const drip = () => make('drip', 32, 128, (g, w, h) => {
   gr.addColorStop(0, 'rgba(240,190,60,.8)'); gr.addColorStop(.8, 'rgba(245,225,170,.45)'); gr.addColorStop(1, 'rgba(245,225,170,0)');
   g.fillStyle = gr; g.beginPath(); g.moveTo(8, 0); g.lineTo(24, 0); g.lineTo(19, h * .85); g.quadraticCurveTo(16, h, 13, h * .85); g.closePath(); g.fill();
 });
+
+// 当たった跡（材質ごと）。透明背景に描く
+function crack(g, cx, cy, n, len, color, width = 1.2) {
+  g.strokeStyle = color; g.lineWidth = width; g.lineCap = 'round';
+  for (let i = 0; i < n; i++) {
+    let a = rnd() * Math.PI * 2, x = cx, y = cy, l = len * (0.5 + rnd() * 0.6);
+    g.beginPath(); g.moveTo(x, y);
+    const steps = 4 + Math.floor(rnd() * 3);
+    for (let s = 0; s < steps; s++) { a += (rnd() - 0.5) * 0.9; x += Math.cos(a) * l / steps; y += Math.sin(a) * l / steps; g.lineTo(x, y); }
+    g.stroke();
+  }
+}
+export const scuff = (kind, i) => make('scuff_' + kind + i, 128, 128, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  const cx = w / 2 + (rnd() - .5) * 8, cy = h / 2 + (rnd() - .5) * 8;
+  if (kind === 'wall') {
+    // 壁紙のへこみと破れ
+    const rg = g.createRadialGradient(cx, cy, 2, cx, cy, 34);
+    rg.addColorStop(0, 'rgba(70,60,50,.55)'); rg.addColorStop(.5, 'rgba(90,80,70,.25)'); rg.addColorStop(1, 'rgba(90,80,70,0)');
+    g.fillStyle = rg; g.beginPath(); g.ellipse(cx, cy, 34, 26, rnd() * 3, 0, 7); g.fill();
+    g.fillStyle = 'rgba(40,34,28,.5)'; g.beginPath(); g.ellipse(cx, cy, 9 + rnd() * 5, 6 + rnd() * 4, rnd() * 3, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,252,245,.85)';
+    for (let k = 0; k < 3; k++) { g.beginPath(); const a = rnd() * 6.28; g.moveTo(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8); g.lineTo(cx + Math.cos(a + .4) * 20, cy + Math.sin(a + .4) * 20); g.lineTo(cx + Math.cos(a + .7) * 10, cy + Math.sin(a + .7) * 10); g.fill(); }
+    crack(g, cx, cy, 4, 34, 'rgba(60,52,44,.55)');
+  } else if (kind === 'tile') {
+    // タイルのひび
+    g.fillStyle = 'rgba(60,62,64,.6)'; g.beginPath();
+    for (let a = 0; a < 7; a++) { const ang = a / 7 * 6.28, r = 5 + rnd() * 6; a ? g.lineTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r) : g.moveTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r); }
+    g.closePath(); g.fill();
+    crack(g, cx, cy, 6, 60, 'rgba(50,52,55,.75)', 1.1);
+    crack(g, cx, cy, 5, 30, 'rgba(255,255,255,.6)', .8);
+  } else if (kind === 'wood') {
+    // 扉・棚のえぐれ
+    g.fillStyle = 'rgba(80,55,30,.6)'; g.beginPath(); g.ellipse(cx, cy, 16 + rnd() * 8, 8 + rnd() * 5, rnd() * 3, 0, 7); g.fill();
+    g.fillStyle = 'rgba(245,225,190,.8)'; g.beginPath(); g.ellipse(cx - 3, cy - 3, 10, 4, rnd() * 3, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(90,60,30,.55)'; g.lineWidth = 1;
+    for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(cx + (rnd() - .5) * 20, cy + (rnd() - .5) * 10); g.lineTo(cx + (rnd() - .5) * 60, cy + (rnd() - .5) * 20); g.stroke(); }
+  } else if (kind === 'steel') {
+    // 金属のひっかき傷
+    const ang = rnd() * 3;
+    for (let k = 0; k < 9; k++) {
+      const off = (rnd() - .5) * 26, len = 20 + rnd() * 40;
+      g.strokeStyle = k % 2 ? 'rgba(255,255,255,.7)' : 'rgba(60,62,66,.55)'; g.lineWidth = .8 + rnd();
+      g.beginPath(); g.moveTo(cx + Math.cos(ang) * -len / 2 - Math.sin(ang) * off, cy + Math.sin(ang) * -len / 2 + Math.cos(ang) * off);
+      g.lineTo(cx + Math.cos(ang) * len / 2 - Math.sin(ang) * off, cy + Math.sin(ang) * len / 2 + Math.cos(ang) * off); g.stroke();
+    }
+    const rg = g.createRadialGradient(cx, cy, 1, cx, cy, 14); rg.addColorStop(0, 'rgba(50,50,55,.45)'); rg.addColorStop(1, 'rgba(50,50,55,0)');
+    g.fillStyle = rg; g.beginPath(); g.arc(cx, cy, 14, 0, 7); g.fill();
+  } else {
+    // 床：黒いこすれ跡と小さなへこみ
+    const ang = rnd() * 3;
+    g.save(); g.translate(cx, cy); g.rotate(ang);
+    for (let k = 0; k < 4; k++) { g.fillStyle = `rgba(30,24,20,${.15 + rnd() * .25})`; g.fillRect(-40 + rnd() * 20, -6 + k * 3 + rnd() * 2, 50 + rnd() * 30, 1.5 + rnd() * 2); }
+    g.restore();
+    g.fillStyle = 'rgba(40,30,20,.5)'; g.beginPath(); g.ellipse(cx, cy, 5, 3.5, ang, 0, 7); g.fill();
+  }
+}, { });
