@@ -135,7 +135,7 @@ export class World {
   // ================= ステージ構築 =================
   build() {
     this.stage = new THREE.Group(); this.scene.add(this.stage);
-    this.dyn = []; this.shards = []; this.cans = []; this.splats = []; this.drips = [];
+    this.dyn = []; this.shards = []; this.cans = []; this.splats = []; this.drips = []; this.trails = [];
     this.statics = [];
     this.fridgeFront = null;
     this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items();
@@ -573,18 +573,25 @@ export class World {
   throwHeld(swing) {
     if (!this.heldMesh) return null;
     const cam = this.camera;
-    // 見ている方向 ＋ 振った方向（小さなブレは無視して「まっすぐ」に寄せる）
-    const dz = (a, zone, k) => Math.abs(a) < zone ? 0 : Math.sign(a) * (Math.abs(a) - zone) * k;
-    const sy = clamp(dz(swing.yaw, 10 * D2R, 1.1), -65 * D2R, 65 * D2R);
-    const sp = clamp(dz(swing.pitch, 12 * D2R, swing.pitch < 0 ? 1.1 : 0.8), -75 * D2R, 40 * D2R);
-    const speed = 7 + 8 * swing.power;
+    // 見ている方向 ＋ 振った方向。
+    // センサーの方向はブレるので、はっきり横／下に振ったときだけ曲げる（それ以外はまっすぐ）
+    let sy = 0, sp = 0;
+    const ay = Math.abs(swing.yaw);
+    if (ay > 28 * D2R) sy = Math.sign(swing.yaw) * clamp(20 * D2R + (ay - 28 * D2R) * 0.8, 20 * D2R, 55 * D2R);
+    if (swing.pitch < -32 * D2R) sp = -clamp(30 * D2R + (-swing.pitch - 32 * D2R) * 0.9, 30 * D2R, 65 * D2R);
+    else if (swing.pitch > 35 * D2R) sp = 12 * D2R;
+    const speed = 6 + 5 * swing.power;
     // 画面中央の先にある面までの距離（まっすぐ投げたらそこに当たるように重力分を補正）
     const look = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
     const hit = new THREE.Raycaster(cam.position, look, 0.2, 8).intersectObjects(this.stage.children, true)[0];
     const dist = hit ? hit.distance : 3;
     const comp = 0.5 * Math.asin(clamp(9.82 * dist / (speed * speed), 0, 1));
-    const yaw = this.yaw - sy;
-    const pitch = clamp(this.pitch + sp + comp * Math.max(0, 1 + sp / (40 * D2R)), -85 * D2R, 70 * D2R);
+    // 手元から「画面中央の先の点」へ向ける（手が右下にあるぶんのズレをなくす）
+    const handPos = new THREE.Vector3(); this.heldMesh.getWorldPosition(handPos);
+    const aim = cam.position.clone().addScaledVector(look, dist).sub(handPos).normalize();
+    const yaw0 = Math.atan2(-aim.x, -aim.z), pitch0 = Math.asin(clamp(aim.y, -1, 1));
+    const yaw = yaw0 - sy;
+    const pitch = clamp(pitch0 + sp + comp * Math.max(0, 1 + sp / (40 * D2R)), -85 * D2R, 70 * D2R);
     const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
 
     const world = new THREE.Vector3(); this.heldMesh.getWorldPosition(world);
@@ -603,9 +610,59 @@ export class World {
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion);
     const spin = kind === 'can' ? rand(8, 18) : rand(4, 10);
     body.angularVelocity.set(right.x * spin + rand(-2, 2), rand(-3, 3), right.z * spin + rand(-2, 2));
+    this._addTrail(body, kind);
     this._trimCans();
     this._refill(0.34);
     return { dir, speed };
+  }
+
+  // 飛んでいる物の軌跡（カメラに向いた細い帯）
+  _addTrail(body, kind) {
+    const N = 14;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(N * 2 * 3), 3));
+    const alpha = new Float32Array(N * 2);
+    for (let i = 0; i < N; i++) { const a = Math.pow(1 - i / (N - 1), 1.6); alpha[i * 2] = a; alpha[i * 2 + 1] = a; }
+    g.setAttribute('alpha', new THREE.Float32BufferAttribute(alpha, 1));
+    const idx = []; for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    g.setIndex(idx);
+    if (!this._trailMat) {
+      this._trailMat = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+        uniforms: { uColor: { value: new THREE.Color('#fff3e0') }, uFade: { value: 1 } },
+        vertexShader: 'attribute float alpha; varying float vA; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+        fragmentShader: 'uniform vec3 uColor; uniform float uFade; varying float vA; void main(){ gl_FragColor = vec4(uColor, vA * 0.55 * uFade); }'
+      });
+    }
+    const mat = this._trailMat.clone();
+    const mesh = new THREE.Mesh(g, mat); mesh.frustumCulled = false;
+    this.stage.add(mesh);
+    const p = body.position;
+    const pts = Array.from({ length: N }, () => new THREE.Vector3(p.x, p.y, p.z));
+    this.trails.push({ body, mesh, pts, width: kind === 'can' ? 0.05 : 0.04, fade: 1, done: false });
+  }
+  _updateTrails(dt) {
+    const cam = this.camera.position;
+    const tmp = new THREE.Vector3(), side = new THREE.Vector3(), toCam = new THREE.Vector3();
+    for (const t of this.trails) {
+      const b = t.body;
+      if (!t.done && (b.ud.hit || b.ud.dead || !b.world)) t.done = true;
+      if (!t.done) { t.pts.pop(); t.pts.unshift(new THREE.Vector3(b.position.x, b.position.y, b.position.z)); }
+      else { t.fade -= dt / 0.25; t.pts.pop(); t.pts.push(t.pts[t.pts.length - 1].clone()); }
+      const pos = t.mesh.geometry.attributes.position;
+      for (let i = 0; i < t.pts.length; i++) {
+        const a = t.pts[i], b2 = t.pts[Math.min(i + 1, t.pts.length - 1)], c = t.pts[Math.max(i - 1, 0)];
+        tmp.subVectors(c, b2); if (tmp.lengthSq() < 1e-8) tmp.set(0, 0, 1);
+        toCam.subVectors(cam, a);
+        side.crossVectors(tmp, toCam).normalize().multiplyScalar(t.width * (1 - i / t.pts.length) * 0.5);
+        pos.setXYZ(i * 2, a.x + side.x, a.y + side.y, a.z + side.z);
+        pos.setXYZ(i * 2 + 1, a.x - side.x, a.y - side.y, a.z - side.z);
+      }
+      pos.needsUpdate = true;
+      t.mesh.material.uniforms.uFade.value = Math.max(0, t.fade);
+    }
+    for (const t of this.trails) if (t.fade <= 0) { t.mesh.parent && t.mesh.parent.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh.material.dispose(); }
+    this.trails = this.trails.filter(t => t.fade > 0);
   }
 
   _trimCans() {
@@ -816,6 +873,8 @@ export class World {
       if ((b.sleepState === CANNON.Body.SLEEPING && age > 0.5) || age > 7) this._bake(b);
     }
     this.debrisSolid.flush(); this.debrisGlass.flush();
+
+    this._updateTrails(dt);
 
     // 缶が転がる音
     for (const b of this.cans) {

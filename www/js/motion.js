@@ -7,13 +7,16 @@ import * as THREE from 'three';
 const D2R = Math.PI / 180;
 
 export const SWING = {
-  startAccel: 5.0,     // これを超えたら振り始めとみなす（m/s²）
-  startRot: 260,       // または回転速度（°/s）
-  minSpeed: 0.45,      // これ未満のピーク速度は投擲にしない（m/s）
-  lightSpeed: 1.0,     // LIGHT/NORMALの境目
-  hardSpeed: 2.3,      // NORMAL/HARDの境目
-  maxDuration: 450,    // 振り始めからこの時間で強制リリース（ms）
-  minDuration: 55
+  startAccel: 12,      // 振り始めとみなす加速度（m/s²）。傾けただけでは届かない値
+  minPeakAccel: 17,    // 投擲として認める最大加速度の下限
+  minRot: 150,         // 腕を振ると必ず手首も回る。回転の最大値の下限（°/s）
+  minSpeed: 1.3,       // 投擲として認める腕の速さの下限（m/s）
+  lightSpeed: 2.0,     // LIGHT/NORMALの境目
+  hardSpeed: 3.2,      // NORMAL/HARDの境目
+  fullSpeed: 4.0,      // これ以上は同じ強さ（上限）
+  maxDuration: 450,    // 振り始めからこの時間で打ち切り（ms）
+  minDuration: 70,     // これより短い揺れは無視（ms）
+  settleAfterHold: 180 // HOLDした直後の指の押し込みの揺れは無視（ms）
 };
 
 export class SwingDetector {
@@ -67,6 +70,7 @@ export class SwingDetector {
   // HOLD成立時に呼ぶ。今のスマホの向きから「前・右・上」を決める
   arm() {
     this.armed = true; this.state = 'idle'; this.buf.length = 0;
+    this.armedAt = performance.now(); this.ignoreUntil = this.armedAt + SWING.settleAfterHold;
     this.basis = this._makeBasis();
     this.debug.status = this.hasMotion ? '振ってOK' : 'センサーなし';
   }
@@ -115,6 +119,7 @@ export class SwingDetector {
     const aw = this.toWorld(new THREE.Vector3(ax, ay, az).multiplyScalar(this.signFix));
     const accMag = aw.length();
     const rot = rr ? Math.hypot(rr.alpha || 0, rr.beta || 0, rr.gamma || 0) : 0;
+    if (rr && rr.alpha != null) this.hasRotationRate = true;
     this.debug.acc = accMag; this.debug.rot = rot;
     if (this.onSample) this.onSample(accMag, rot);
 
@@ -123,10 +128,12 @@ export class SwingDetector {
 
     if (!this.armed) return;
     if (this.state === 'idle') {
-      if (accMag > SWING.startAccel || rot > SWING.startRot) {
-        this.state = 'swing'; this.t0 = now; this.v.set(0, 0, 0); this.peakSpeed = 0; this.peakAcc = 0;
-        // 少し前から積分して振り始めの取りこぼしを減らす
-        for (const s of this.buf) if (now - s.t <= 70) this.v.addScaledVector(s.a, s.dt);
+      // 回転だけ（傾けただけ）では始めない。はっきりした加速度が必要
+      if (now > this.ignoreUntil && accMag > SWING.startAccel) {
+        // 姿勢が後から取れた場合は基準を作り直す
+        if (!this.basis || (this.basis.mode === 'device' && this.orientOK)) this.basis = this._makeBasis();
+        this.state = 'swing'; this.t0 = now; this.v.set(0, 0, 0); this.peakSpeed = 0; this.peakAcc = 0; this.peakRot = 0;
+        for (const s of this.buf) if (now - s.t <= 60) this.v.addScaledVector(s.a, s.dt);
       }
       return;
     }
@@ -135,19 +142,39 @@ export class SwingDetector {
     const sp = this.v.length();
     if (sp > this.peakSpeed) { this.peakSpeed = sp; this.peakV.copy(this.v); }
     this.peakAcc = Math.max(this.peakAcc, accMag);
+    this.peakRot = Math.max(this.peakRot, rot);
     this.debug.speed = sp;
     const el = now - this.t0;
-    const dropped = el > SWING.minDuration && sp < this.peakSpeed * 0.72;
-    const calmed = el > 80 && accMag < this.peakAcc * 0.3 && this.peakAcc > SWING.startAccel * 1.4;
-    if (dropped || calmed || el > SWING.maxDuration) this._release();
+    const dropped = el > SWING.minDuration && sp < this.peakSpeed * 0.7;
+    const calmed = el > SWING.minDuration && accMag < 3 && sp < this.peakSpeed * 0.85;
+    if (dropped || calmed || el > SWING.maxDuration) this._release(el);
   }
 
-  _release() {
+  _release(el) {
     const peak = this.peakSpeed;
     this.state = 'idle';
-    if (peak < SWING.minSpeed) { this.debug.status = '弱すぎたので投げない'; return; }
+    const reason = this._reject(peak, el);
+    if (reason) {
+      this.debug.status = reason;
+      this.ignoreUntil = performance.now() + 120; // 振りかぶりの戻りなどを拾わないよう少し待つ
+      return;
+    }
+    this.debug.status = '投げた';
     this.armed = false;
     this.onRelease && this.onRelease(this.describe(this.peakV, peak));
+  }
+
+  // 投擲として認めない理由（認めるなら null）
+  _reject(peak, el) {
+    if (el < SWING.minDuration) return '短すぎる揺れ';
+    if (this.peakAcc < SWING.minPeakAccel) return '振りが弱い';
+    if (peak < SWING.minSpeed) return '振りが弱い';
+    if (this.hasRotationRate && this.peakRot < SWING.minRot) return '腕の振りになっていない';
+    // 振りかぶり（手前・上に引く動き）は投擲にしない
+    const b = this.basis || this._makeBasis();
+    const vf = this.peakV.dot(b.f), vu = this.peakV.dot(b.u);
+    if (vf < 0.25 * peak && vu > -0.5 * peak) return '振りかぶり';
+    return null;
   }
 
   // 速度ベクトル → 投擲パラメータ
@@ -157,9 +184,9 @@ export class SwingDetector {
     let yaw = Math.atan2(vr, Math.max(0.2 * speed, vf));       // 右が正
     let pitch = Math.atan2(vu, Math.hypot(Math.max(0, vf), vr)); // 上が正
     const cls = speed < SWING.lightSpeed ? 'LIGHT' : speed < SWING.hardSpeed ? 'NORMAL' : 'HARD';
-    // NORMALで十分な強さになるように持ち上げ、上限もかける
-    const x = Math.min(1, Math.max(0, (speed - 0.4) / (2.8 - 0.4)));
-    const power = 0.55 + 0.45 * (x * x * (3 - 2 * x));
+    // NORMALの真ん中あたりで十分な強さ。上限あり
+    const x = Math.min(1, Math.max(0, (speed - SWING.minSpeed) / (SWING.fullSpeed - SWING.minSpeed)));
+    const power = 0.5 + 0.5 * (x * x * (3 - 2 * x));
     return { yaw, pitch, speed, power, cls, raw: { vf, vr, vu } };
   }
 
@@ -167,7 +194,7 @@ export class SwingDetector {
   simulate(dx, dy, pxPerMs) {
     if (!this.armed) return false;
     const len = Math.hypot(dx, dy) || 1;
-    const speed = Math.min(3.5, pxPerMs * 1.2);
+    const speed = Math.min(4.2, 1.3 + pxPerMs * 1.0);
     const vec = new THREE.Vector3();
     const b = this.basis || this._makeBasis();
     // 上へ払う＝前、下へ払う＝下、左右＝左右
