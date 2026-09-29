@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609291736';
-import { SwingDetector } from './motion.js?v=202609291736';
-import { sfx } from './audio.js?v=202609291736';
-import { haptics, hapticSettings } from './haptics.js?v=202609291736';
+import { World } from './world.js?v=202609291742';
+import { SwingDetector } from './motion.js?v=202609291742';
+import { sfx } from './audio.js?v=202609291742';
+import { haptics, hapticSettings } from './haptics.js?v=202609291742';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -42,7 +42,13 @@ async function enterStage(type) {
   if (type === 'photo' && !world.photoTex) {
     const note = $('#photoNote'), btn = $('#stagePhoto');
     btn.disabled = true; note.textContent = '写真を読み込み中…';
-    try { world.photoTex = await World.loadPhoto('./assets/real-kitchen/front120.jpg'); }
+    try {
+      [world.photoTex, world.photoItemsTex] = await Promise.all([
+        World.loadPhoto('./assets/real-kitchen/front120.jpg'),
+        World.loadPhoto('./assets/real-kitchen/front120_items.jpg').catch(() => null)
+      ]);
+      world.photoBounds = await fetch('./assets/real-kitchen/photo.json').then(r => r.json()).then(j => j.bounds).catch(() => null);
+    }
     catch (e) { note.textContent = '写真を読み込めませんでした。もう一度押してください'; btn.disabled = false; return; }
     btn.disabled = false; note.textContent = '正面だけ見られる、写真の台所（試作）';
   }

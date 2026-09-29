@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291736';
-import { sfx } from './audio.js?v=202609291736';
-import { haptics } from './haptics.js?v=202609291736';
+import * as TX from './textures.js?v=202609291742';
+import { sfx } from './audio.js?v=202609291742';
+import { haptics } from './haptics.js?v=202609291742';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -167,7 +167,10 @@ export class World {
     for (const [cx, cy] of [[tw, th], [-tw, th], [tw, -th], [-tw, -th]]) {
       const v = new THREE.Vector3(cx, cy, -1).applyEuler(e);
       if (v.z >= 0) return false;
-      if (Math.abs(v.x / -v.z) > 0.985 * PHOTO_TAN || Math.abs(v.y / -v.z) > 0.985 * PHOTO_TAN) return false;
+      // 写真がきちんと写っている範囲（tan）。未指定なら画角いっぱい
+      const B = this.photoBounds || { l: -PHOTO_TAN, r: PHOTO_TAN, b: -PHOTO_TAN, t: PHOTO_TAN };
+      const x = v.x / -v.z, y = v.y / -v.z;
+      if (x < B.l * 0.985 || x > B.r * 0.985 || y < B.b * 0.985 || y > B.t * 0.985) return false;
     }
     return true;
   }
@@ -244,20 +247,106 @@ export class World {
     });
   }
   _makePhoto() {
-    const tex = this.photoTex; if (!tex) return;
-    const dyn = new Set(this.dyn.map(r => r.mesh));
+    const clean = this.photoTex; if (!clean) return;
+    const items = this.photoItemsTex || clean;
+    const dynSet = new Set(this.dyn.map(r => r.mesh));
     const shadowMat = this._shadowMat || (this._shadowMat = new THREE.ShadowMaterial({ opacity: 0.3 }));
     for (const o of [...this.stage.children]) {
-      if (!o.isMesh || dyn.has(o)) continue;
+      if (!o.isMesh || dynSet.has(o)) continue;
       o.material = shadowMat; o.castShadow = false; o.receiveShadow = true;
       o.traverse(c => { if (c !== o && c.isMesh) { c.material = shadowMat; c.castShadow = false; } });
     }
     const d = 6;
-    // 写真自体が夜なので、ほんの少しだけ暗く
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d * PHOTO_TAN, 2 * d * PHOTO_TAN), new THREE.MeshBasicMaterial({ map: tex, color: '#ffffff', depthTest: false, depthWrite: false, toneMapped: false }));
+    // 背景は「小物ありの写真」
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d * PHOTO_TAN, 2 * d * PHOTO_TAN), new THREE.MeshBasicMaterial({ map: items, depthTest: false, depthWrite: false, toneMapped: false }));
     m.position.set(EYE.x, EYE.y, EYE.z - d); m.renderOrder = -10; m.frustumCulled = false;
     this.stage.add(m);
+    if (!this.photoItemsTex) return;
+
+    // 写真を撮ったカメラ（目の位置・正面・120°）
+    const pc = this.photoCam || (this.photoCam = new THREE.PerspectiveCamera(120, 1, 0.01, 50));
+    pc.position.copy(EYE); pc.rotation.set(0, 0, 0); pc.updateMatrixWorld(); pc.updateProjectionMatrix();
+    this._photoPixels();
+    // 置いてある小物：止まっている間は隠して写真に任せる。見た目は写真から貼っておく
+    for (const rec of this.dyn) {
+      const root = rec.mesh;
+      root.updateMatrixWorld(true);
+      const b = rec.body;
+      rec.photo = { state: 'rest', pos: b.position.clone(), quat: b.quaternion.clone(), patch: null };
+      const patch = new THREE.Group();
+      root.traverse(o => {
+        if (!o.isMesh) return;
+        const g = o.geometry.clone();
+        const pos = g.attributes.position, uv = new Float32Array(pos.count * 2), v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld).project(pc);
+          uv[i * 2] = v.x * 0.5 + 0.5; uv[i * 2 + 1] = v.y * 0.5 + 0.5;
+        }
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        o.geometry = g;
+        o.material = new THREE.MeshBasicMaterial({ map: items, toneMapped: false, side: THREE.DoubleSide });
+        o.castShadow = false;
+        // 動いたあとに、元の場所を「小物なしの写真」で塗る板（少し大きく、縁はぼかす）
+        const pm = new THREE.Mesh(g, this._patchMaterial(clean));
+        pm.matrixAutoUpdate = false; pm.matrix.copy(o.matrixWorld); pm.frustumCulled = false; pm.renderOrder = -9;
+        patch.add(pm);
+      });
+      // 中心から少し膨らませる
+      const box = new THREE.Box3().setFromObject(root), c = box.getCenter(new THREE.Vector3());
+      const inflate = new THREE.Matrix4().makeTranslation(c.x, c.y, c.z).multiply(new THREE.Matrix4().makeScale(1.18, 1.12, 1.18)).multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
+      patch.children.forEach(pm => pm.matrix.premultiply(inflate));
+      rec.photo.patch = patch;
+      // 破片の色は写真のその場所の色に
+      const col = this._photoColorAt(c);
+      if (col) root.userData.color = col;
+      root.visible = false;
+    }
   }
+
+  _patchMaterial(tex) {
+    if (this._patchMat && this._patchMat.uniforms.map.value === tex) return this._patchMat;
+    this._patchMat = new THREE.ShaderMaterial({
+      uniforms: { map: { value: tex } },
+      transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+      vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+        void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalMatrix * normal; vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+        void main(){ vec4 c = texture2D(map, vUv); float e = clamp(abs(dot(normalize(vN), normalize(vV))) * 2.5, 0.0, 1.0); gl_FragColor = vec4(c.rgb, e);
+        #include <colorspace_fragment>
+        }`
+    });
+    return this._patchMat;
+  }
+
+  // 写真の画素を読めるようにしておく（破片の色に使う）
+  _photoPixels() {
+    if (this._pix || !this.photoItemsTex) return;
+    const img = this.photoItemsTex.image; const N = 512;
+    const c = document.createElement('canvas'); c.width = c.height = N;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0, N, N);
+    try { this._pix = { data: g.getImageData(0, 0, N, N).data, N }; } catch (e) { this._pix = null; }
+  }
+  _photoColorAt(worldPos) {
+    const px = this._pix; if (!px) return null;
+    const v = worldPos.clone().project(this.photoCam);
+    const x = Math.round((v.x * 0.5 + 0.5) * (px.N - 1)), y = Math.round((1 - (v.y * 0.5 + 0.5)) * (px.N - 1));
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const xx = Math.min(px.N - 1, Math.max(0, x + dx)), yy = Math.min(px.N - 1, Math.max(0, y + dy)), i = (yy * px.N + xx) * 4;
+      r += px.data[i]; g += px.data[i + 1]; b += px.data[i + 2]; n++;
+    }
+    return new THREE.Color().setRGB(r / n / 255, g / n / 255, b / n / 255, THREE.SRGBColorSpace);
+  }
+
+  // 写真の小物を3Dに入れ替える（動いた・割れた・卵が付いた瞬間）
+  _wake(rec) {
+    if (!rec || !rec.photo || rec.photo.state !== 'rest') return;
+    rec.photo.state = 'live';
+    rec.mesh.visible = true;
+    rec.mesh.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    this.stage.add(rec.photo.patch);
+  }
+  _recOf(body) { return this.dyn.find(r => r.body === body); }
 
   _room() {
     const { x0, x1, z0, z1, h } = ROOM;
@@ -808,6 +897,7 @@ export class World {
   _early() { return this.clock < this._wakeGuard; }
 
   _break(b, v, point, normal) {
+    this._wake(this._recOf(b));
     const ud = b.ud, m = ud.mesh;
     const glass = ud.kind === 'glass';
     let pos = new THREE.Vector3(b.position.x, b.position.y, b.position.z);
@@ -877,6 +967,7 @@ export class World {
     m.quaternion.copy(q); m.rotateZ(rand(0, Math.PI * 2));
     m.position.copy(point).addScaledVector(normal, 0.003);
     const target = oud.static ? this.stage : (oud.mesh || this.stage);
+    if (!oud.static) this._wake(this._recOf(other));
     this.stage.add(m); m.updateMatrixWorld(true);
     if (target !== this.stage) target.attach(m);
     this.splats.push(m);
@@ -916,7 +1007,7 @@ export class World {
     m.rotateZ(rand(0, Math.PI * 2));
     m.position.copy(point).addScaledVector(normal, offset);
     this.stage.add(m); m.updateMatrixWorld(true);
-    if (!oud.static && oud.mesh) oud.mesh.attach(m);
+    if (!oud.static && oud.mesh) { this._wake(this._recOf(other)); oud.mesh.attach(m); }
     this.splats.push(m);
     while (this.splats.length > LIMITS.splats) { const o = this.splats.shift(); o.parent && o.parent.remove(o); o.geometry.dispose(); o.material.dispose(); }
     return m;
@@ -983,7 +1074,11 @@ export class World {
     this.physics.step(1 / 120, dt, 8);
     this._processEvents();
 
-    for (const r of this.dyn) { r.mesh.position.copy(r.body.position); r.mesh.quaternion.copy(r.body.quaternion); }
+    for (const r of this.dyn) {
+      r.mesh.position.copy(r.body.position); r.mesh.quaternion.copy(r.body.quaternion);
+      const ph = r.photo;
+      if (ph && ph.state === 'rest' && (r.body.position.distanceTo(ph.pos) > 0.004 || Math.abs(r.body.quaternion.dot(ph.quat)) < 0.9998)) this._wake(r);
+    }
 
     // 破片が落ち着いたらまとめ描画へ
     for (const b of [...this.shards]) {
