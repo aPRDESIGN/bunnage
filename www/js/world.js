@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291658';
-import { sfx } from './audio.js?v=202609291658';
-import { haptics } from './haptics.js?v=202609291658';
+import * as TX from './textures.js?v=202609291659';
+import { sfx } from './audio.js?v=202609291659';
+import { haptics } from './haptics.js?v=202609291659';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -142,6 +142,8 @@ export class World {
     this.fridgeFront = null;
     this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items();
     if (this.stageType === 'real') this._makeReal();
+    // 写真の明るさに3Dの小物を少し寄せる
+    this.renderer.toneMappingExposure = this.stageType === 'real' ? 0.72 : 0.82;
     this._wakeGuard = this.clock + 0.3;
   }
 
@@ -199,7 +201,7 @@ export class World {
   _makeReal() {
     const faces = this.photoFaces; if (!faces) return;
     const dyn = new Set(this.dyn.map(r => r.mesh));
-    const shadowMat = this._shadowMat || (this._shadowMat = new THREE.ShadowMaterial({ opacity: 0.32 }));
+    const shadowMat = this._shadowMat || (this._shadowMat = new THREE.ShadowMaterial({ opacity: 0.22 }));
     for (const o of [...this.stage.children]) {
       if (!o.isMesh || dyn.has(o)) continue;
       o.material = shadowMat; o.castShadow = false; o.receiveShadow = true;
