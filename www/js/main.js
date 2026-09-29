@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609291721';
-import { SwingDetector } from './motion.js?v=202609291721';
-import { sfx } from './audio.js?v=202609291721';
-import { haptics, hapticSettings } from './haptics.js?v=202609291721';
+import { World } from './world.js?v=202609291723';
+import { SwingDetector } from './motion.js?v=202609291723';
+import { sfx } from './audio.js?v=202609291723';
+import { haptics, hapticSettings } from './haptics.js?v=202609291723';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -47,7 +47,7 @@ async function enterStage(type) {
     btn.disabled = false; note.textContent = '正面だけ見られる、写真の台所（試作）';
   }
   world.reset(type);
-  world.yaw = 0; world.pitch = -0.12;
+  world.yaw = 0; world.pitch = type === 'photo' ? 0 : -0.12;
   show('item');
 }
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));
@@ -139,8 +139,9 @@ touch.addEventListener('pointermove', (e) => {
   if (ptr.kind === 'cam') {
     if (camLocked()) return;
     const L = world.viewLimits();
-    world.yaw = clamp(world.yaw + dx * 0.0048, -L.yaw, L.yaw);
-    world.pitch = clamp(world.pitch + dy * 0.0048, L.pitchMin, L.pitchMax);
+    [world.yaw, world.pitch] = world.clampView(
+      clamp(world.yaw + dx * 0.0048, -L.yaw, L.yaw),
+      clamp(world.pitch + dy * 0.0048, L.pitchMin, L.pitchMax));
   } else if (ptr.kind === 'hold' && !det.hasMotion && det.armed) {
     // センサーなしのテスト用：払う速さのピークを過ぎたら投げる
     ptr.hist.push([e.clientX, e.clientY, now]);

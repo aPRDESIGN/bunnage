@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291721';
-import { sfx } from './audio.js?v=202609291721';
-import { haptics } from './haptics.js?v=202609291721';
+import * as TX from './textures.js?v=202609291723';
+import { sfx } from './audio.js?v=202609291723';
+import { haptics } from './haptics.js?v=202609291723';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -148,67 +148,28 @@ export class World {
     this.camera.updateProjectionMatrix();
   }
 
-  // 見回せる範囲（ラジアン）。写真のステージは写真（正面90°×90°）の端が画面に入らない範囲だけ
+  // 見回せる範囲（ラジアン）
   viewLimits() {
     if (this.stageType !== 'photo') return { yaw: 90 * D2R, pitchMin: -65 * D2R, pitchMax: 50 * D2R };
-    const vHalf = this.camera.fov / 2 * D2R;
-    const hHalf = Math.atan(Math.tan(vHalf) * this.camera.aspect);
-    const edge = 45 * D2R - 1 * D2R;
-    // 斜めを向くと四隅が先に写真の外に出るので、少し余裕をとる
-    return { yaw: Math.max(0, edge - hHalf) * 0.85, pitchMin: -Math.max(0, edge - vHalf) * 0.85, pitchMax: Math.max(0, edge - vHalf) * 0.85 };
+    return { yaw: 40 * D2R, pitchMin: -35 * D2R, pitchMax: 35 * D2R };
   }
-
-  // ================= ステージ構築 =================
-  build() {
-    this.stage = new THREE.Group(); this.scene.add(this.stage);
-    this.dyn = []; this.shards = []; this.cans = []; this.splats = []; this.drips = []; this.trails = [];
-    this.statics = [];
-    this.fridgeFront = null;
-    this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items();
-    if (this.stageType === 'photo') this._makePhoto();
-    this.resize(this._w || 1, this._h || 1);
-    // 写真の明るさに3Dの小物を少し寄せる
-    this.renderer.toneMappingExposure = 0.8;
-    this._wakeGuard = this.clock + 0.3;
-  }
-
-  // すべて片付けて初期状態に戻す
-  reset(type) {
-    if (type) this.stageType = type;
-    for (const b of [...this.physics.bodies]) this.physics.removeBody(b);
-    this.stage.traverse(o => { if (o.geometry) o.geometry.dispose(); });
-    this.scene.remove(this.stage);
-    this.debrisSolid.clear(); this.debrisGlass.clear();
-    this.events.length = 0;
-    this.build();
-  }
-
-  mat(color, rough = 0.6, metal = 0, extra = {}) {
-    return new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...extra });
-  }
-
-  // 静的な箱（見た目＋物理）
-  box(w, h, d, x, y, z, material, opt = {}) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
-    m.position.set(x, y, z); if (opt.rotY) m.rotation.y = opt.rotY;
-    m.receiveShadow = opt.receive !== false; m.castShadow = !!opt.cast;
-    this.stage.add(m);
-    if (opt.phys !== false) {
-      const b = new CANNON.Body({ mass: 0, material: this.matDefault });
-      const [pw, ph, pd] = opt.pd || [w, h, d];
-      const [px, py, pz] = opt.pp || [x, y, z];
-      b.addShape(new CANNON.Box(new CANNON.Vec3(pw / 2, ph / 2, pd / 2)));
-      b.position.set(px, py, pz); if (opt.rotY) b.quaternion.setFromEuler(0, opt.rotY, 0);
-      b.ud = { surface: opt.surface || 'wood', mesh: m, static: true };
-      this.physics.addBody(b);
+  // 写真のステージ：画面の四隅がすべて写真（正面90°×90°）の中に収まるか
+  _viewOK(yaw, pitch) {
+    const e = new THREE.Euler(pitch, yaw, 0, 'YXZ');
+    const th = Math.tan(this.camera.fov / 2 * D2R), tw = th * this.camera.aspect;
+    for (const [cx, cy] of [[tw, th], [-tw, th], [tw, -th], [-tw, -th]]) {
+      const v = new THREE.Vector3(cx, cy, -1).applyEuler(e);
+      if (v.z >= 0) return false;
+      if (Math.abs(v.x / -v.z) > 0.985 || Math.abs(v.y / -v.z) > 0.985) return false;
     }
-    return m;
+    return true;
   }
-  // 見た目だけの板
-  plane(w, h, x, y, z, material, rotY = 0, rotX = 0) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
-    m.position.set(x, y, z); m.rotation.set(rotX, rotY, 0, 'YXZ'); m.receiveShadow = true;
-    this.stage.add(m); return m;
+  // 見たい向き → 実際に向ける向き（写真の外が見えそうなら、端に沿って止める）
+  clampView(yaw, pitch) {
+    if (this.stageType !== 'photo' || this._viewOK(yaw, pitch)) return [yaw, pitch];
+    if (this._viewOK(yaw, this.pitch)) return [yaw, this.pitch];
+    if (this._viewOK(this.yaw, pitch)) return [this.yaw, pitch];
+    return [this.yaw, this.pitch];
   }
 
   // ---- 写真のキッチン（正面の1枚だけ） ----
