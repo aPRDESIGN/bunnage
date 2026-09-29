@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291723';
-import { sfx } from './audio.js?v=202609291723';
-import { haptics } from './haptics.js?v=202609291723';
+import * as TX from './textures.js?v=202609291725';
+import { sfx } from './audio.js?v=202609291725';
+import { haptics } from './haptics.js?v=202609291725';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -170,6 +170,60 @@ export class World {
     if (this._viewOK(yaw, this.pitch)) return [yaw, this.pitch];
     if (this._viewOK(this.yaw, pitch)) return [this.yaw, pitch];
     return [this.yaw, this.pitch];
+  }
+
+
+  // ================= ステージ構築 =================
+  build() {
+    this.stage = new THREE.Group(); this.scene.add(this.stage);
+    this.dyn = []; this.shards = []; this.cans = []; this.splats = []; this.drips = []; this.trails = [];
+    this.statics = [];
+    this.fridgeFront = null;
+    this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items();
+    if (this.stageType === 'photo') this._makePhoto();
+    this.resize(this._w || 1, this._h || 1);
+    // 写真の明るさに3Dの小物を少し寄せる
+    this.renderer.toneMappingExposure = 0.8;
+    this._wakeGuard = this.clock + 0.3;
+  }
+
+  // すべて片付けて初期状態に戻す
+  reset(type) {
+    if (type) this.stageType = type;
+    for (const b of [...this.physics.bodies]) this.physics.removeBody(b);
+    this.stage.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    this.scene.remove(this.stage);
+    this.debrisSolid.clear(); this.debrisGlass.clear();
+    this.events.length = 0;
+    this.build();
+  }
+
+  mat(color, rough = 0.6, metal = 0, extra = {}) {
+    return new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...extra });
+  }
+
+  // 静的な箱（見た目＋物理）
+  box(w, h, d, x, y, z, material, opt = {}) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+    m.position.set(x, y, z); if (opt.rotY) m.rotation.y = opt.rotY;
+    m.receiveShadow = opt.receive !== false; m.castShadow = !!opt.cast;
+    this.stage.add(m);
+    if (opt.phys !== false) {
+      const b = new CANNON.Body({ mass: 0, material: this.matDefault });
+      const [pw, ph, pd] = opt.pd || [w, h, d];
+      const [px, py, pz] = opt.pp || [x, y, z];
+      b.addShape(new CANNON.Box(new CANNON.Vec3(pw / 2, ph / 2, pd / 2)));
+      b.position.set(px, py, pz); if (opt.rotY) b.quaternion.setFromEuler(0, opt.rotY, 0);
+      b.ud = { surface: opt.surface || 'wood', mesh: m, static: true };
+      this.physics.addBody(b);
+    }
+    return m;
+  }
+  // 見た目だけの板
+  plane(w, h, x, y, z, material, rotY = 0, rotX = 0) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
+    m.position.set(x, y, z); m.rotation.set(rotX, rotY, 0, 'YXZ'); m.receiveShadow = true;
+    this.stage.add(m); return m;
   }
 
   // ---- 写真のキッチン（正面の1枚だけ） ----
