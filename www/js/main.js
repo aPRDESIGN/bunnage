@@ -36,13 +36,30 @@ function show(id) {
   mode = id;
 }
 
-$('#stageKitchen').addEventListener('click', async () => {
+async function enterStage(type) {
   sfx.unlock();
   if (!permAsked) { permAsked = true; await det.requestPermission(); det.start(); }
-  world.reset();
+  if (type === 'real' && !world.photoFaces) {
+    const note = $('#realNote'), btn = $('#stageReal');
+    btn.disabled = true;
+    try {
+      const urls = await fetch('./assets/real-kitchen.json').then(r => r.json());
+      delete urls.note;
+      note.textContent = '写真を読み込み中… 0%';
+      world.photoFaces = await World.loadPhotos(urls, (p) => { note.textContent = `写真を読み込み中… ${Math.round(p * 100)}%`; });
+      note.textContent = '同じ台所を写真風にした試作版';
+    } catch (e) {
+      note.textContent = '写真を読み込めませんでした。通信状態を確かめてもう一度押してください';
+      btn.disabled = false; return;
+    }
+    btn.disabled = false;
+  }
+  world.reset(type);
   world.yaw = 0; world.pitch = -0.12;
   show('item');
-});
+}
+$('#stageKitchen').addEventListener('click', () => enterStage('cg'));
+$('#stageReal').addEventListener('click', () => enterStage('real'));
 
 document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {
   sfx.unlock();

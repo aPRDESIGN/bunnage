@@ -107,6 +107,8 @@ export class World {
 
     this.events = [];
     this.clock = 0;
+    this.stageType = 'cg';
+    this.photoFaces = null;
     this.build();
   }
 
@@ -139,11 +141,13 @@ export class World {
     this.statics = [];
     this.fridgeFront = null;
     this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items();
+    if (this.stageType === 'real') this._makeReal();
     this._wakeGuard = this.clock + 0.3;
   }
 
   // すべて片付けて初期状態に戻す
-  reset() {
+  reset(type) {
+    if (type) this.stageType = type;
     for (const b of [...this.physics.bodies]) this.physics.removeBody(b);
     this.stage.traverse(o => { if (o.geometry) o.geometry.dispose(); });
     this.scene.remove(this.stage);
@@ -178,6 +182,43 @@ export class World {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), material);
     m.position.set(x, y, z); m.rotation.set(rotX, rotY, 0, 'YXZ'); m.receiveShadow = true;
     this.stage.add(m); return m;
+  }
+
+  // ---- 写真のキッチン ----
+  // 固定の目の位置から撮った5方向の写真を、撮ったときと同じ向き・画角の板として目の周りに並べる。
+  // 3Dの部屋は見えない「影だけ」の面にして、物理・当たり判定・影・傷・卵の跡の土台として使う。
+  static async loadPhotos(urls, onProgress) {
+    const loader = new THREE.TextureLoader(); loader.setCrossOrigin('anonymous');
+    const keys = Object.keys(urls); let done = 0;
+    const out = {};
+    await Promise.all(keys.map(k => new Promise((res, rej) => loader.load(urls[k], (t) => {
+      t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; out[k] = t; done++; onProgress && onProgress(done / keys.length); res();
+    }, undefined, rej))));
+    return out;
+  }
+  _makeReal() {
+    const faces = this.photoFaces; if (!faces) return;
+    const dyn = new Set(this.dyn.map(r => r.mesh));
+    const shadowMat = this._shadowMat || (this._shadowMat = new THREE.ShadowMaterial({ opacity: 0.32 }));
+    for (const o of [...this.stage.children]) {
+      if (!o.isMesh || dyn.has(o)) continue;
+      o.material = shadowMat; o.castShadow = false; o.receiveShadow = true;
+      o.traverse(c => { if (c !== o && c.isMesh) { c.material = shadowMat; c.castShadow = false; } });
+    }
+    const sky = new THREE.Group(); sky.position.copy(EYE);
+    const d = 6;
+    const dirs = { front: [0, 0], left: [Math.PI / 2, 0], right: [-Math.PI / 2, 0], up: [0, Math.PI / 2], down: [0, -Math.PI / 2] };
+    for (const [k, [yaw, pitch]] of Object.entries(dirs)) {
+      if (!faces[k]) continue;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * d, 2 * d), new THREE.MeshBasicMaterial({ map: faces[k], depthTest: false, depthWrite: false, toneMapped: false }));
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
+      m.position.copy(new THREE.Vector3(0, 0, -d).applyQuaternion(q)); m.quaternion.copy(q);
+      m.renderOrder = -10; m.frustumCulled = false;
+      sky.add(m);
+    }
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(2 * d, 2 * d), new THREE.MeshBasicMaterial({ color: '#bdb6aa', depthTest: false, depthWrite: false, toneMapped: false }));
+    back.position.set(0, 0, d); back.rotation.y = Math.PI; back.renderOrder = -11; sky.add(back);
+    this.stage.add(sky);
   }
 
   _room() {
