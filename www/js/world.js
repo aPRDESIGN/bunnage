@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291758';
-import { sfx } from './audio.js?v=202609291758';
-import { haptics } from './haptics.js?v=202609291758';
+import * as TX from './textures.js?v=202609291802';
+import { sfx } from './audio.js?v=202609291802';
+import { haptics } from './haptics.js?v=202609291802';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -659,8 +659,10 @@ export class World {
     // 見ている方向 ＋ 振った方向。
     // センサーの方向はブレるので、はっきり横／下に振ったときだけ曲げる（それ以外はまっすぐ）
     let sy = 0, sp = 0;
+    // 横は「はっきり横に振った」ときだけ。曲げても画面の中に収まる範囲まで
     const ay = Math.abs(swing.yaw);
-    if (ay > 28 * D2R) sy = Math.sign(swing.yaw) * clamp(20 * D2R + (ay - 28 * D2R) * 0.8, 20 * D2R, 55 * D2R);
+    const hHalf = Math.atan(Math.tan(cam.fov / 2 * D2R) * cam.aspect);
+    if (ay > 42 * D2R) sy = Math.sign(swing.yaw) * clamp(8 * D2R + (ay - 42 * D2R) * 0.5, 8 * D2R, hHalf * 0.8);
     if (swing.pitch < -32 * D2R) sp = -clamp(30 * D2R + (-swing.pitch - 32 * D2R) * 0.9, 30 * D2R, 65 * D2R);
     else if (swing.pitch > 35 * D2R) sp = 12 * D2R;
     const speed = 6 + 5 * swing.power;
