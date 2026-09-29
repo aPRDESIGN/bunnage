@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609291725';
-import { SwingDetector } from './motion.js?v=202609291725';
-import { sfx } from './audio.js?v=202609291725';
-import { haptics, hapticSettings } from './haptics.js?v=202609291725';
+import { World } from './world.js?v=202609291731';
+import { SwingDetector } from './motion.js?v=202609291731';
+import { sfx } from './audio.js?v=202609291731';
+import { haptics, hapticSettings } from './haptics.js?v=202609291731';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -42,7 +42,7 @@ async function enterStage(type) {
   if (type === 'photo' && !world.photoTex) {
     const note = $('#photoNote'), btn = $('#stagePhoto');
     btn.disabled = true; note.textContent = '写真を読み込み中…';
-    try { world.photoTex = await World.loadPhoto('./assets/real-kitchen/front.jpg'); }
+    try { world.photoTex = await World.loadPhoto('./assets/real-kitchen/front120.jpg'); }
     catch (e) { note.textContent = '写真を読み込めませんでした。もう一度押してください'; btn.disabled = false; return; }
     btn.disabled = false; note.textContent = '正面だけ見られる、写真の台所（試作）';
   }
