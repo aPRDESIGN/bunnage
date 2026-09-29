@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291744';
-import { sfx } from './audio.js?v=202609291744';
-import { haptics } from './haptics.js?v=202609291744';
+import * as TX from './textures.js?v=202609291751';
+import { sfx } from './audio.js?v=202609291751';
+import { haptics } from './haptics.js?v=202609291751';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -293,8 +293,8 @@ export class World {
       });
       // 中心から少し膨らませる
       const box = new THREE.Box3().setFromObject(root), c = box.getCenter(new THREE.Vector3());
-      const inflate = new THREE.Matrix4().makeTranslation(c.x, c.y, c.z).multiply(new THREE.Matrix4().makeScale(1.18, 1.12, 1.18)).multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
-      patch.children.forEach(pm => pm.matrix.premultiply(inflate));
+      const inflate = new THREE.Matrix4().makeTranslation(c.x, c.y, c.z).multiply(new THREE.Matrix4().makeScale(1.32, 1.25, 1.32)).multiply(new THREE.Matrix4().makeTranslation(-c.x, -c.y, -c.z));
+      patch.children.forEach(pm => { pm.matrix.premultiply(inflate); pm.matrixWorldNeedsUpdate = true; });
       rec.photo.patch = patch;
       // 破片の色は写真のその場所の色に
       const col = this._photoColorAt(c);
@@ -307,11 +307,11 @@ export class World {
     if (this._patchMat && this._patchMat.uniforms.map.value === tex) return this._patchMat;
     this._patchMat = new THREE.ShaderMaterial({
       uniforms: { map: { value: tex } },
-      transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+      transparent: false, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
       vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV;
         void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalMatrix * normal; vV = -mv.xyz; gl_Position = projectionMatrix * mv; }`,
       fragmentShader: `uniform sampler2D map; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
-        void main(){ vec4 c = texture2D(map, vUv); float e = clamp(abs(dot(normalize(vN), normalize(vV))) * 2.5, 0.0, 1.0); gl_FragColor = vec4(c.rgb, e);
+        void main(){ vec4 c = texture2D(map, vUv); gl_FragColor = vec4(c.rgb, 1.0);
         #include <colorspace_fragment>
         }`
     });
