@@ -2,9 +2,9 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291659';
-import { sfx } from './audio.js?v=202609291659';
-import { haptics } from './haptics.js?v=202609291659';
+import * as TX from './textures.js?v=202609291707';
+import { sfx } from './audio.js?v=202609291707';
+import { haptics } from './haptics.js?v=202609291707';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
