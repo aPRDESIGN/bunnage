@@ -2,10 +2,10 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609291834';
-import { sfx } from './audio.js?v=202609291834';
-import { GiantVase } from './vase.js?v=202609291834';
-import { haptics } from './haptics.js?v=202609291834';
+import * as TX from './textures.js?v=202609300324';
+import { sfx } from './audio.js?v=202609300324';
+import { GiantVase } from './vase.js?v=202609300324';
+import { haptics } from './haptics.js?v=202609300324';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -170,7 +170,7 @@ export class World {
     this.lampBroken = false; this.windowState = 0;
     this.statics = [];
     this.fridgeFront = null;
-    this.vases = [];
+    this.vases = []; this.vaseSlots = [];
     if (this.stageType === 'warehouse') this._warehouse();
     else { this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items(); }
     this._setLightLevel(this.stageType === 'warehouse' ? 0 : 1);
@@ -238,28 +238,32 @@ export class World {
       this.box(1.2, 0.05, 0.12, x, Hh - 0.4, z, this.mat('#ffffff', 0.4, 0, { emissive: '#dfe9f2', emissiveIntensity: 0.9 }), { phys: false });
       const l = new THREE.PointLight('#cfdbe6', 1.2, 7, 2); l.position.set(x, Hh - 0.5, z); this.stage.add(l);
     }
-    // 壺を照らすスポットライト
-    const center = this.vaseCenter = new THREE.Vector3(0, 0.14, -2.4);
-    const spot = new THREE.SpotLight('#fff0d8', 90, 14, 0.42, 0.55, 2);
-    spot.position.set(0.9, 6.2, -0.8); spot.target.position.set(0, 1.1, -2.4);
-    spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024); spot.shadow.bias = -0.0006; spot.shadow.normalBias = 0.02;
-    this.stage.add(spot, spot.target);
-    const fill = new THREE.PointLight('#8fa2bb', 5, 10, 2); fill.position.set(0, 3.2, 2.6); this.stage.add(fill);
-    // 台（パレット）と区画線
+    // 壺を3つ並べ、それぞれスポットライトで照らす
     const wood = this.mat('#9c7a52', 0.8);
-    this.box(1.4, 0.14, 1.4, center.x, 0.07, center.z, wood, { surface: 'wood' });
     const tape = this.mat('#ffffff', 0.7, 0, { map: TX.hazard() });
-    const s = 1.6;
-    [[0, -s, 0], [0, s, 0], [-s, 0, Math.PI / 2], [s, 0, Math.PI / 2]].forEach(([dx, dz, r]) => {
-      const m = this.plane(3.3, 0.12, center.x + dx, 0.003, center.z + dz, tape, r, -Math.PI / 2); m.receiveShadow = true;
+    this.vaseSlots = [];
+    [[-1.9, 'seiji'], [0, 'sometsuke'], [1.9, 'kuro']].forEach(([x, style], k) => {
+      const center = new THREE.Vector3(x, 0.14, -2.3);
+      const spot = new THREE.SpotLight('#fff0d8', 55, 12, 0.33, 0.55, 2);
+      spot.position.set(x + 0.4, 6.0, -0.9); spot.target.position.set(x, 1.0, -2.3);
+      if (k === 1) { spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024); spot.shadow.bias = -0.0006; spot.shadow.normalBias = 0.02; spot.angle = 0.62; spot.intensity = 70; spot.target.position.set(0, 0.8, -2.3); }
+      this.stage.add(spot, spot.target);
+      this.box(1.3, 0.14, 1.3, center.x, 0.07, center.z, wood, { surface: 'wood' });
+      this.vaseSlots.push({ center, style, vase: null, pending: false });
+    });
+    const fill = new THREE.PointLight('#8fa2bb', 5, 10, 2); fill.position.set(0, 3.2, 2.6); this.stage.add(fill);
+    // 区画線
+    const sx = 3.0, sz = 1.3, cz = -2.3;
+    [[0, -sz, 0, sx * 2 + 0.1], [0, sz, 0, sx * 2 + 0.1], [-sx, 0, Math.PI / 2, sz * 2 + 0.1], [sx, 0, Math.PI / 2, sz * 2 + 0.1]].forEach(([dx, dz, r, len]) => {
+      const m = this.plane(len, 0.12, dx, 0.003, cz + dz, tape, r, -Math.PI / 2); m.receiveShadow = true;
     });
     // 脇の積まれたパレットとドラム缶
-    for (let k = 0; k < 4; k++) this.box(1.2, 0.14, 1.0, -4.6, 0.07 + k * 0.15, -3.5 + (k % 2) * 0.05, wood, { surface: 'wood', cast: true });
-    [['#2f5d8a', 4.3, -3.2], ['#8a2f2f', 4.9, -2.6], ['#2f5d8a', 4.6, -4.0]].forEach(([c, x, z]) => {
+    for (let k = 0; k < 4; k++) this.box(1.2, 0.14, 1.0, -5.0, 0.07 + k * 0.15, -3.5 + (k % 2) * 0.05, wood, { surface: 'wood', cast: true });
+    [['#2f5d8a', 4.6, -3.4], ['#8a2f2f', 5.2, -2.8], ['#2f5d8a', 4.9, -4.2]].forEach(([c, x, z]) => {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.88, 24), this.mat(c, 0.5, 0.4)); m.position.set(x, 0.44, z); m.castShadow = m.receiveShadow = true; this.stage.add(m);
       const b = new CANNON.Body({ mass: 0 }); b.addShape(new CANNON.Cylinder(0.29, 0.29, 0.88, 12)); b.position.set(x, 0.44, z); b.ud = { static: true, surface: 'steel' }; this.physics.addBody(b);
     });
-    this.vases.push(new GiantVase(this, center));
+    for (const slot of this.vaseSlots) { slot.vase = new GiantVase(this, slot.center, { style: slot.style }); this.vases.push(slot.vase); }
   }
 
   _room() {
@@ -840,7 +844,7 @@ export class World {
         case 'vasePiece':
           if (v > 2.2 && oud.static && !oud.vase) {
             sfx.ceramic(clamp(v / 14, 0.15, 0.5));
-            if (v > 3.5 && Math.random() < 0.6) for (let i = 0; i < 3; i++) this._shard(e.point.clone().addScaledVector(e.normal, 0.02), new THREE.Vector3(rand(-1, 1), rand(0.5, 1.5), rand(-1, 1)), rand(0.01, 0.025), 0.006, new THREE.Color(Math.random() < 0.5 ? '#eceee8' : '#cdb592'), false);
+            if (v > 3.5 && Math.random() < 0.6) for (let i = 0; i < 3; i++) this._shard(e.point.clone().addScaledVector(e.normal, 0.02), new THREE.Vector3(rand(-1, 1), rand(0.5, 1.5), rand(-1, 1)), rand(0.01, 0.025), 0.006, (Math.random() < 0.5 && b.ud.color) ? b.ud.color.clone() : new THREE.Color('#cdb592'), false);
           }
           break;
         case 'clock':
@@ -1142,15 +1146,22 @@ export class World {
         r.mesh.position.copy(r.off).applyQuaternion(tq).add(r.body.position);
       } else { r.mesh.position.copy(r.body.position); r.mesh.quaternion.copy(r.body.quaternion); }
     }
-    // 壺：全体の9割近く割れたら、残りを崩して次の壺を落とす
+    // 壺：割り切ったら、少しして同じ場所に次の壺を落とす
     for (const v of this.vases) v.update(dt);
-    const cur = this.vases[this.vases.length - 1];
-    if (cur && cur.done && !cur.drop && this.clock - cur.lastHit > 2.2) {
-      for (const p of cur.pieces) if (p.attached) cur._detach(p, new THREE.Vector3(rand(-0.4, 0.4), 0, rand(-0.4, 0.4)));
-      cur.lastHit = Infinity;
-      setTimeout(() => { if (this.vases.includes(cur)) this.vases.push(new GiantVase(this, this.vaseCenter, { drop: true })); }, 1800);
+    for (const slot of this.vaseSlots || []) {
+      const cur = slot.vase;
+      if (cur && cur.done && !cur.drop && !slot.pending && this.clock - cur.lastHit > 1.2) {
+        cur.collapseAll();
+        slot.pending = true;
+        const stageNow = this.stage;
+        setTimeout(() => {
+          if (this.stage !== stageNow) return;
+          slot.vase = new GiantVase(this, slot.center, { drop: true, style: slot.style });
+          this.vases.push(slot.vase); slot.pending = false;
+        }, 1600);
+      }
     }
-    this.vases = this.vases.filter((v, i) => i === this.vases.length - 1 || v.pieces.some(p => p.dyn));
+    this.vases = this.vases.filter(v => (this.vaseSlots || []).some(s => s.vase === v) || v.pieces.some(p => p.dyn));
 
     // 破片が落ち着いたらまとめ描画へ
     for (const b of [...this.shards]) {

@@ -2,8 +2,8 @@
 // 当たった周りのかけらだけを外す。支えを失ったかけらは崩れ落ちる。
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { sfx } from './audio.js?v=202609291834';
-import { haptics } from './haptics.js?v=202609291834';
+import { sfx } from './audio.js?v=202609300324';
+import { haptics } from './haptics.js?v=202609300324';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -23,23 +23,47 @@ function radius(y) {
 }
 const dRadius = (y) => (radius(Math.min(H, y + 0.005)) - radius(Math.max(0, y - 0.005))) / 0.01;
 
-// 釉薬の模様（白地に藍の染付風）
-const C_WHITE = new THREE.Color('#eceee8'), C_BLUE = new THREE.Color('#1f3f86'), C_BLUE2 = new THREE.Color('#3a5fa8'), C_BISQUE = new THREE.Color('#cdb592');
-function glaze(th, y, out) {
-  const band = (y > 0.1 && y < 0.16) || (y > 1.62 && y < 1.7) || (y > 2.12 && y < 2.18);
-  const wave = Math.sin(th * 6 + Math.sin(y * 5) * 1.8) + Math.sin(th * 11 - y * 3) * 0.35;
-  const inPanel = y > 0.3 && y < 1.5;
-  if (band) out.copy(C_BLUE);
-  else if (inPanel && wave > 0.95) out.copy(C_BLUE2);
-  else if (!inPanel && y > 1.72 && y < 2.1 && Math.sin(th * 18) > 0.7) out.copy(C_BLUE2);
-  else out.copy(C_WHITE);
-  return out;
+// 釉薬の模様。3種類（白地に藍の染付／青磁／黒釉に錆色の帯）
+const C_BISQUE = new THREE.Color('#cdb592');
+const STYLES = {
+  sometsuke: { base: '#eceee8', a: '#1f3f86', b: '#3a5fa8' },
+  seiji: { base: '#8fb9a3', a: '#6f9d86', b: '#a9cdb9' },
+  kuro: { base: '#26211e', a: '#8a4a26', b: '#3a302a' }
+};
+function glazeFor(style) {
+  const P = STYLES[style] || STYLES.sometsuke;
+  const base = new THREE.Color(P.base), A = new THREE.Color(P.a), B = new THREE.Color(P.b);
+  return (th, y, out) => {
+    const band = (y > 0.1 && y < 0.16) || (y > 1.62 && y < 1.7) || (y > 2.12 && y < 2.18);
+    if (style === 'seiji') {
+      // 青磁：ほぼ無地、下に向かって釉溜まりで濃く、細かい貫入
+      out.copy(base).lerp(A, clamp(1 - y / 1.2, 0, 0.6));
+      if (Math.sin(th * 40 + y * 30) > 0.97 || Math.sin(th * 23 - y * 41) > 0.985) out.lerp(B, 0.8);
+      return out;
+    }
+    if (style === 'kuro') {
+      out.copy(base);
+      if (band || (y > 1.35 && y < 1.55)) out.copy(A);
+      else if (Math.sin(y * 18 + Math.sin(th * 3) * 2) > 0.8) out.copy(B);
+      return out;
+    }
+    const wave = Math.sin(th * 6 + Math.sin(y * 5) * 1.8) + Math.sin(th * 11 - y * 3) * 0.35;
+    const inPanel = y > 0.3 && y < 1.5;
+    if (band) out.copy(A);
+    else if (inPanel && wave > 0.95) out.copy(B);
+    else if (!inPanel && y > 1.72 && y < 2.1 && Math.sin(th * 18) > 0.7) out.copy(B);
+    else out.copy(base);
+    return out;
+  };
 }
 
 export class GiantVase {
   constructor(world, center, opts = {}) {
     this.world = world; this.center = center.clone();
-    this.nT = opts.nT || 18; this.nY = opts.nY || 12;
+    this.nT = opts.nT || 12; this.nY = opts.nY || 8;
+    this.glaze = glazeFor(opts.style); this.style = opts.style || 'sometsuke';
+    this.baseColor = new THREE.Color((STYLES[this.style] || STYLES.sometsuke).base);
+    this.hits = 0;
     this.group = new THREE.Group(); world.stage.add(this.group);
     this.pieces = []; this.detached = 0; this.lastHit = 0;
     this.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.22, metalness: 0, envMapIntensity: 1.1 });
@@ -79,7 +103,7 @@ export class GiantVase {
       const grid = [];
       for (let a = 0; a <= S; a++) { grid.push([]); for (let b = 0; b <= S; b++) grid[a].push(at(a / S, b / S)); }
       const outer = (p) => P(p, radius(p.y)), inner = (p) => P(p, Math.max(0.05, radius(p.y) - T));
-      const gc = (p) => glaze(p.th, p.y, new THREE.Color());
+      const gc = (p) => this.glaze(p.th, p.y, new THREE.Color());
       // 外側（釉薬）と内側（素焼き）
       for (let a = 0; a < S; a++) for (let b = 0; b < S; b++) {
         const p00 = grid[a][b], p10 = grid[a + 1][b], p11 = grid[a + 1][b + 1], p01 = grid[a][b + 1];
@@ -138,7 +162,7 @@ export class GiantVase {
     });
   }
 
-  get done() { return this.detached >= this.pieces.length * 0.88; }
+  get done() { return this.detached >= this.pieces.length * 0.85; }
   idx(i, j) { const n = this.nT; return j * n + ((i % n) + n) % n; }
 
   // 当たった：勢いに応じた範囲のかけらを外す。周りにはひび
@@ -146,8 +170,8 @@ export class GiantVase {
     const W = this.world;
     if (kind === 'vasePiece' && W.clock < (this.readyAt || 0)) return;
     const E = 0.5 * mass * v * v;
-    let R = 0.14 + 0.07 * Math.sqrt(E);
-    if (kind === 'egg') R *= 0.25;
+    let R = 0.2 + 0.055 * Math.sqrt(E);
+    if (kind === 'egg') R *= 0.2;
     if (kind === 'vasePiece') R *= 0.6;
     const hitP = this.pieces[idx];
     const out = [];
@@ -159,10 +183,16 @@ export class GiantVase {
     }
     for (const [p, d] of out) {
       const k = 1 - clamp(d / R, 0, 1);
-      const vel = dir.clone().multiplyScalar(rand(0.3, 1.2) * v * 0.18 * (0.4 + k))
+      const vel = dir.clone().multiplyScalar(rand(0.3, 1.2) * v * 0.22 * (0.4 + k))
         .addScaledVector(p.normal, rand(0.2, 1.4) * (0.5 + k))
         .add(new THREE.Vector3(0, rand(0, 1.2), 0));
       this._detach(p, vel);
+    }
+    if (out.length && kind !== 'vasePiece') this.hits++;
+    // だいたい5回で割り切れるように：5回目で残りが一気に崩れる
+    if (this.hits >= 5 && !this._finishing) {
+      this._finishing = true;
+      setTimeout(() => this.collapseAll(), 180);
     }
     if (out.length) {
       sfx.ceramic(clamp(E / 25, 0.5, 1)); sfx.knock(6, 0.45);
@@ -173,7 +203,7 @@ export class GiantVase {
       const n = Math.min(14, 3 + out.length * 2);
       for (let i = 0; i < n; i++) {
         const pv = hitP.normal.clone().multiplyScalar(rand(0.5, 2)).add(new THREE.Vector3(rand(-1, 1), rand(0, 1.5), rand(-1, 1)));
-        W._shard(point.clone().addScaledVector(hitP.normal, 0.03), pv, rand(0.01, 0.035), 0.006, Math.random() < 0.6 ? C_WHITE.clone() : C_BISQUE.clone(), false);
+        W._shard(point.clone().addScaledVector(hitP.normal, 0.03), pv, rand(0.01, 0.035), 0.006, Math.random() < 0.6 ? this.baseColor.clone() : C_BISQUE.clone(), false);
       }
       this._collapse();
     } else if (kind !== 'egg') {
@@ -207,7 +237,7 @@ export class GiantVase {
     b.linearDamping = 0.05; b.angularDamping = 0.2; b.sleepSpeedLimit = 0.15; b.sleepTimeLimit = 0.5;
     // 見た目の中心と当たり判定の中心のずれを保つ
     const off = mesh.position.clone().sub(p.bodyPos).applyQuaternion(p.bodyQuat.clone().invert());
-    b.ud = { mesh, kind: 'vasePiece', born: W.clock, vase: null, off };
+    b.ud = { mesh, kind: 'vasePiece', born: W.clock, vase: null, off, color: this.baseColor };
     W.physics.addBody(b);
     b.addEventListener('collide', (e) => W._queue(b, e));
     W.dyn.push({ body: b, mesh, off: new THREE.Vector3().copy(off), meshQuat: p.bodyQuat.clone().invert().multiply(mesh.quaternion.clone()) });
@@ -232,12 +262,23 @@ export class GiantVase {
     // 横のつながりが細くなった段も崩れやすく：1段の残りが3片以下なら上ごと落とす
     for (let j = 1; j < nY; j++) {
       let alive = 0; for (let i = 0; i < nT; i++) if (this.pieces[this.idx(i, j)].attached) alive++;
-      if (alive > 0 && alive <= 3) {
+      if (alive > 0 && alive <= Math.ceil(nT * 0.25)) {
         for (let jj = j; jj < nY; jj++) for (let i = 0; i < nT; i++) { const p = this.pieces[this.idx(i, jj)]; if (p.attached) { this._detach(p, new THREE.Vector3(rand(-0.3, 0.3), 0, rand(-0.3, 0.3))); n++; } }
         break;
       }
     }
     if (n > 6) { setTimeout(() => { sfx.ceramic(1); sfx.knock(8, 0.35); }, 250); setTimeout(() => sfx.ceramic(0.8), 520); }
+  }
+
+  // 残りを一気に崩す
+  collapseAll() {
+    let n = 0;
+    for (const p of this.pieces) if (p.attached) {
+      const up = clamp(p.bodyPos.y - this.center.y, 0, 2.2);
+      this._detach(p, p.normal.clone().multiplyScalar(rand(0.3, 1.6)).add(new THREE.Vector3(rand(-0.3, 0.3), rand(-0.5, 0.8) + up * 0.2, rand(-0.3, 0.3))));
+      n++;
+    }
+    if (n) { sfx.ceramic(1); sfx.knock(10, 0.3); setTimeout(() => sfx.ceramic(1), 120); setTimeout(() => { sfx.ceramic(0.8); sfx.knock(7, 0.35); }, 380); haptics.break(); this.world._puff(this.center.clone().add(new THREE.Vector3(0, 0.3, 0)), new THREE.Vector3(0, 1, 0), '#d9d3c6', 2); }
   }
 
   _bake(p) {
@@ -250,6 +291,7 @@ export class GiantVase {
     p.dyn = false;
   }
   bakeAll() { for (const p of this.pieces) if (p.dyn) this._bake(p); }
+  bakeNear(c, r) { for (const p of this.pieces) if (p.dyn && p.mesh.position.distanceTo(c) < r + 1.2) this._bake(p); }
 
   update(dt) {
     const W = this.world;
@@ -258,7 +300,7 @@ export class GiantVase {
       if (this.drop.y <= 0) {
         this.drop = null; this.group.position.y = 0;
         // 前の壺のかけらはその場で止めて床に残す（新しい壺とぶつからないように）
-        for (const o of W.vases) if (o !== this) o.bakeAll();
+        for (const o of W.vases) if (o !== this) o.bakeNear(this.center, 1.3);
         this.readyAt = W.clock + 1;
         this._addBodies();
         sfx.knock(10, 0.3); sfx.metal(3); haptics.hit(1);
