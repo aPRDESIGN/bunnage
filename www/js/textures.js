@@ -876,3 +876,27 @@ export const crushed = (i) => make('crushed' + i, 256, 128, (g, w, h) => {
   g.fillStyle = '#141414'; g.beginPath(); g.arc(rnd() * w, h - 10, 22, 0, 7); g.fill();
   noise(g, w, h, 5000, .15);
 });
+
+// ハンマーのへこみ跡（くぼみの陰、はがれた塗装のふち、地金のこすれ）
+export const dentMark = (i) => make('dentmark' + i, 256, 256, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  const cx = w / 2 + (rnd() - .5) * 10, cy = h / 2 + (rnd() - .5) * 10;
+  // くぼみの陰（片側が暗く、反対側が明るい）
+  let rg = g.createRadialGradient(cx + 10, cy + 10, 4, cx, cy, 90);
+  rg.addColorStop(0, 'rgba(10,8,6,.55)'); rg.addColorStop(.5, 'rgba(20,16,12,.22)'); rg.addColorStop(1, 'rgba(20,16,12,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, w, h);
+  rg = g.createRadialGradient(cx - 14, cy - 14, 2, cx - 14, cy - 14, 50);
+  rg.addColorStop(0, 'rgba(255,255,255,.22)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, w, h);
+  // はがれた塗装のふち（ぎざぎざ）
+  g.fillStyle = 'rgba(165,170,174,.95)'; g.beginPath();
+  for (let a = 0; a < 18; a++) { const ang = a / 18 * 6.283, r = 20 + rnd() * 16; a ? g.lineTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r) : g.moveTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r); }
+  g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(30,25,20,.7)'; g.lineWidth = 1.5; g.stroke();
+  // 地金のこすれ（ハンマーが滑った筋）
+  const ang0 = rnd() * 6.283;
+  for (let k = 0; k < 14; k++) { const a = ang0 + (rnd() - .5) * .5, off = (rnd() - .5) * 24, len = 20 + rnd() * 50; g.strokeStyle = `rgba(230,232,235,${.35 + rnd() * .4})`; g.lineWidth = .8 + rnd() * 1.4; g.beginPath(); g.moveTo(cx - Math.sin(a) * off, cy + Math.cos(a) * off); g.lineTo(cx - Math.sin(a) * off + Math.cos(a) * len, cy + Math.cos(a) * off + Math.sin(a) * len); g.stroke(); }
+  // 塗装のひび
+  for (let k = 0; k < 9; k++) { let a = rnd() * 6.283, x = cx + Math.cos(a) * 30, y = cy + Math.sin(a) * 30; g.strokeStyle = 'rgba(25,20,15,.55)'; g.lineWidth = .9; g.beginPath(); g.moveTo(x, y); for (let s = 0; s < 5; s++) { a += (rnd() - .5) * .8; x += Math.cos(a) * 9; y += Math.sin(a) * 9; g.lineTo(x, y); } g.stroke(); }
+  // 飛び散った塗装のかけら跡
+  for (let k = 0; k < 20; k++) { const a = rnd() * 6.283, d = 36 + rnd() * 40; g.fillStyle = 'rgba(160,165,170,.8)'; g.beginPath(); g.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1.5 + rnd() * 3, 1 + rnd() * 2, rnd() * 3, 0, 7); g.fill(); }
+});

@@ -1,8 +1,8 @@
 // ハンマーで叩く廃車（スクラップ工場）。車本体は car.js をそのまま使い、叩く用の窓口だけここで用意する
 import * as THREE from 'three';
-import { Car } from './car.js?v=202609301013';
-import { sfx } from './audio.js?v=202609301013';
-import { haptics } from './haptics.js?v=202609301013';
+import { Car } from './car.js?v=202609301019';
+import { sfx } from './audio.js?v=202609301019';
+import { haptics } from './haptics.js?v=202609301019';
 
 export class ScrapCar {
   constructor(world, center, opts = {}) {
@@ -22,6 +22,7 @@ export class ScrapCar {
     this.pieces = [{ mesh: c.shell, part: 'body', attached: true }];
     for (const p of Object.values(c.panes)) this.pieces.push({ mesh: p.mesh, part: 'glass:' + p.id, attached: !p.broken, pane: p });
     for (const l of Object.values(c.lights)) this.pieces.push({ mesh: l.mesh, part: 'light:' + l.id, attached: !l.broken, light: l });
+    c.wheels.forEach((w, i) => { this.pieces.push({ mesh: w.tire, part: 'wheel:' + i, attached: true }); this.pieces.push({ mesh: w.face, part: 'wheel:' + i, attached: true, cap: w }); });
   }
 
   // 叩いた物（メッシュ）が車のどこか：部品ならその番号、ほかの車の一部はボディ扱い
@@ -39,14 +40,15 @@ export class ScrapCar {
     if (this.drop) return;
     const pc = this.pieces[idx]; if (!pc) return;
     this.hits++; this.lastHit = this.world.clock;
-    this.car.hit(pc.part, point, dir.clone().negate(), v, mass, 'hammer');
-    // 金属を叩いた手応え
-    if (pc.part === 'body') { sfx.metal(Math.min(8, v)); haptics.hit(1); }
-    for (const p of this.pieces) { if (p.pane) p.attached = !p.pane.broken; if (p.light) p.attached = !p.light.broken; }
+    if (pc.part.startsWith('wheel:')) this.car.hitWheel(+pc.part.slice(6), point, dir);
+    else this.car.hit(pc.part, point, dir.clone().negate(), v, mass, 'hammer');
+    if (pc.part === 'body') haptics.hit(1);
+    for (const p of this.pieces) { if (p.pane) p.attached = !p.pane.broken; if (p.light) p.attached = !p.light.broken; if (p.cap) p.attached = !p.cap.capOff; }
   }
 
   update(dt) {
     const W = this.world;
+    this.car.update(dt);
     if (this.drop) {
       // クレーンから落ちてくる
       this.drop.vy -= 9.8 * dt; this.drop.y += this.drop.vy * dt;

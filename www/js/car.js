@@ -1,9 +1,9 @@
 // 壊せる車（赤いスポーツカー）：凹むボディ、割れるガラス、ライト、ミラー
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import * as TX from './textures.js?v=202609301013';
-import { sfx } from './audio.js?v=202609301013';
-import { haptics } from './haptics.js?v=202609301013';
+import * as TX from './textures.js?v=202609301019';
+import { sfx } from './audio.js?v=202609301019';
+import { haptics } from './haptics.js?v=202609301019';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -80,7 +80,7 @@ export class Car {
     this.paint = new THREE.Color(this.scrap ? ['#6f7d6c', '#8a4b3a', '#5d6773', '#b3aa92', '#3f4f6a'][Math.floor(Math.random() * 5)] : PAINTS[paintIdx++ % PAINTS.length]);
     this.rustSeed = Math.random() * 100;
     this.bodies = []; this.mirrors = []; this.panes = {}; this.lights = {};
-    this.dents = 0; this.lastHit = 0;
+    this.dents = 0; this.lastHit = 0; this.tilt = { x: 0, z: 0 }; this.steamT = 0;
     this._shell(); this._glass(); this._details();
     this.group.updateMatrixWorld(true);
     if (this.scrap) {
@@ -185,6 +185,7 @@ export class Car {
     const G = this.group;
     const tire = new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.9 });
     const rim = new THREE.MeshStandardMaterial({ color: '#a7acb1', roughness: 0.22, metalness: 0.95 });
+    this.wheels = []; this.plates = [];
     for (const x of [-1.46, 1.42]) for (const z of [-0.84, 0.84]) {
       const r0 = x > 0 ? 0.34 : 0.33, sgn = Math.sign(z);
       const t = new THREE.Mesh(new THREE.CylinderGeometry(r0, r0, 0.25, 32), tire); t.rotation.x = Math.PI / 2; t.position.set(x, r0, z); t.castShadow = true; G.add(t);
@@ -194,6 +195,7 @@ export class Car {
       for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; const sp2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.02), rim); sp2.position.set(Math.cos(a) * 0.11, Math.sin(a) * 0.11, sgn * 0.01); sp2.rotation.z = a - Math.PI / 2; face.add(sp2); }
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.235, 0.012, 8, 32), rim); ring.position.z = sgn * 0.01; face.add(ring);
       const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 12), rim); hub.rotation.x = Math.PI / 2; hub.position.z = sgn * 0.015; face.add(hub);
+      this.wheels.push({ x, z, r0, tire: t, face, hits: 0, flat: false, capOff: false });
     }
     // ボディの面に沿って貼る板（ライト・ドアの取っ手など）
     const patch = (x0, x1, p0, p1, U, V, off) => {
@@ -239,6 +241,7 @@ export class Car {
     for (const x of [-2.31, 2.31]) {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(0.33, 0.165), new THREE.MeshStandardMaterial({ map: TX.plate(), roughness: 0.5 }));
       p.position.set(x, x < 0 ? 0.36 : 0.5, 0); p.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2; G.add(p);
+      this.plates.push({ mesh: p, off: false });
     }
     // ミラー（当たると落ちる）
     for (const s of [1, -1]) {
@@ -296,12 +299,22 @@ export class Car {
     const E = 0.5 * mass * v * v;
     if (part === 'body') {
       if (kind === 'egg') return;
+      const hammer = kind === 'hammer';
       const s = clamp(E / 18, 0.15, 1.4);
-      this._dent(point, outward, s);
+      this._dent(point, outward, s, hammer);
       sfx.thunk(v * Math.sqrt(mass / 0.35)); haptics.hit(clamp(s, 0.3, 1));
-      const d = W._decal(point, outward, TX.scuff('steel', Math.floor(Math.random() * 3)), 0.16 + s * 0.1, null, 0.006);
+      const d = W._decal(point, outward, hammer ? TX.dentMark(Math.floor(Math.random() * 3)) : TX.scuff('steel', Math.floor(Math.random() * 3)), hammer ? 0.34 + Math.random() * 0.1 : 0.16 + s * 0.1, null, 0.006);
       this.group.attach(d);
-      for (let i = 0; i < Math.round(2 + s * 5); i++) W._shard(point.clone().addScaledVector(outward, 0.02), outward.clone().multiplyScalar(rand(0.4, 1.4)).add(new THREE.Vector3(rand(-0.6, 0.6), rand(0, 1), rand(-0.6, 0.6))), rand(0.006, 0.015), 0.002, this.paint.clone(), false);
+      const n = hammer ? 14 : Math.round(2 + s * 5);
+      for (let i = 0; i < n; i++) W._shard(point.clone().addScaledVector(outward, 0.02), outward.clone().multiplyScalar(rand(0.6, 2.0)).add(new THREE.Vector3(rand(-0.9, 0.9), rand(0.2, 1.6), rand(-0.9, 0.9))), rand(0.008, hammer ? 0.03 : 0.015), 0.002, i % 3 ? this.paint.clone() : new THREE.Color('#6b3a1e'), false);
+      if (hammer) {
+        sfx.clang(Math.min(1, v / 10));
+        W._puff(point, outward, '#8a6a4a', 0.9);
+        W._puff(point, outward, '#ffcf7a', 0.25);
+        // 近くのナンバープレートは外れる
+        const lp = this.group.worldToLocal(point.clone());
+        this.plates.forEach((pl, k) => { if (!pl.off && lp.distanceTo(pl.mesh.position) < 0.5) this.dropPlate(k); });
+      }
       this.dents++;
     } else if (part.startsWith('glass:')) {
       const p = this.panes[part.slice(6)];
@@ -328,19 +341,68 @@ export class Car {
   }
 
   // 近くの網目を、当たった向きに押し込む
-  _dent(point, outward, s) {
-    const g = this.shell.geometry, P = g.attributes.position;
+  // へこませる。hammer のときは、広くゆるいへこみ＋ハンマーの頭の形の深いくぼみ。塗装もはがれる
+  _dent(point, outward, s, hammer = false) {
+    const g = this.shell.geometry, P = g.attributes.position, Cl = g.attributes.color;
     const lp = this.group.worldToLocal(point.clone());
     const inward = outward.clone().negate().transformDirection(new THREE.Matrix4().copy(this.group.matrixWorld).invert()).normalize();
-    const r = 0.14 + 0.1 * s, depth = Math.min(0.11, 0.025 + 0.05 * s);
-    const v = new THREE.Vector3();
+    const r = hammer ? 0.3 : 0.14 + 0.1 * s, depth = hammer ? 0.07 : Math.min(0.11, 0.025 + 0.05 * s);
+    const rs = 0.075, ds = hammer ? 0.09 * Math.min(1.3, s) : 0;
+    const v = new THREE.Vector3(), c = new THREE.Color(), bare = new THREE.Color('#a4a8ab'), shade = new THREE.Color('#1e1a16');
     for (let i = 0; i < P.count; i++) {
       v.fromBufferAttribute(P, i);
       const d2 = v.distanceToSquared(lp); if (d2 > 9 * r * r) continue;
-      const k = depth * Math.exp(-d2 / (r * r)) * rand(0.85, 1.15);
+      // 同じ所を何度も叩くほど深くなる（ただし突き抜けない）
+      const k = (depth * Math.exp(-d2 / (r * r)) + ds * Math.exp(-d2 / (rs * rs))) * rand(0.85, 1.15);
       P.setXYZ(i, v.x + inward.x * k, v.y + inward.y * k, v.z + inward.z * k);
+      if (hammer && Cl) {
+        c.fromBufferAttribute(Cl, i);
+        const d = Math.sqrt(d2);
+        if (d < rs * 1.1) c.lerp(bare, 0.75);                              // 真ん中は塗装がはがれて地金が出る
+        else if (d < rs * 2.2) c.lerp(Math.random() < 0.5 ? bare : shade, 0.35); // まわりはひび割れた塗装
+        else if (d < r * 1.4) c.multiplyScalar(0.88);                       // へこみの影
+        Cl.setXYZ(i, c.r, c.g, c.b);
+      }
     }
-    P.needsUpdate = true; g.computeVertexNormals();
+    P.needsUpdate = true; if (Cl) Cl.needsUpdate = true; g.computeVertexNormals();
+  }
+
+  // タイヤ：1回目でホイールカバーが外れ、2回目でパンクして車がそちらに傾く
+  hitWheel(i, point, dir) {
+    const W = this.world, w = this.wheels[i]; if (!w) return;
+    w.hits++;
+    sfx.thunk(5); sfx.knock(6, 0.6);
+    if (!w.capOff) {
+      w.capOff = true;
+      const wp = new THREE.Vector3(); w.face.getWorldPosition(wp);
+      const wq = new THREE.Quaternion(); w.face.getWorldQuaternion(wq);
+      W.stage.attach(w.face);
+      const b = W.addDynamic(w.face, new CANNON.Cylinder(0.24, 0.24, 0.04, 12), 1.5, wp, { kind: 'metal' }, { sleep: false });
+      b.quaternion.set(wq.x, wq.y, wq.z, wq.w);
+      const side = Math.sign(w.z);
+      b.velocity.set(rand(-0.6, 0.6), rand(1.5, 2.5), side * rand(1.2, 2.2)); b.angularVelocity.set(rand(-6, 6), rand(-6, 6), rand(-6, 6));
+      sfx.can(6); haptics.hit(1);
+      return;
+    }
+    if (!w.flat) {
+      w.flat = true;
+      // プシューッ
+      sfx.hiss();
+      w.tire.scale.set(1.12, 1, 0.78); w.tire.position.y = w.r0 * 0.8;
+      this.tilt.x += Math.sign(w.z) * -0.035; this.tilt.z += Math.sign(w.x) * 0.03;
+      W._puff(point, dir.clone().negate(), '#9a948a', 1.2);
+      haptics.break();
+    }
+  }
+  // ナンバープレートが外れて落ちる
+  dropPlate(k) {
+    const W = this.world, pl = this.plates[k]; if (!pl || pl.off) return;
+    pl.off = true;
+    const wp = new THREE.Vector3(); pl.mesh.getWorldPosition(wp);
+    W.stage.attach(pl.mesh);
+    const b = W.addDynamic(pl.mesh, new CANNON.Box(new CANNON.Vec3(0.165, 0.083, 0.01)), 0.4, wp, { kind: 'metal' }, { sleep: false, rotY: this.yaw + (k ? Math.PI / 2 : -Math.PI / 2) });
+    b.velocity.set(rand(-0.5, 0.5), 1.2, rand(-0.5, 0.5)); b.angularVelocity.set(rand(-4, 4), rand(-4, 4), rand(-4, 4));
+    sfx.can(4);
   }
 
   // 強化ガラスは一気に粒になって崩れる
@@ -371,6 +433,14 @@ export class Car {
 
   update(dt) {
     const W = this.world;
+    // パンクした側へゆっくり傾く
+    this.group.rotation.x += (this.tilt.x - this.group.rotation.x) * Math.min(1, dt * 4);
+    this.group.rotation.z += (this.tilt.z - this.group.rotation.z) * Math.min(1, dt * 4);
+    // ボコボコになったら、ボンネットから湯気が上がる
+    if (this.scrap && this.dents >= 8 && this.bodies.length) {
+      this.steamT -= dt;
+      if (this.steamT <= 0) { this.steamT = 0.35 + Math.random() * 0.3; W._puff(this.group.localToWorld(new THREE.Vector3(-1.5 + Math.random() * 0.4, 0.75, (Math.random() - 0.5) * 0.6)), new THREE.Vector3(0, 1, 0), this.dents >= 14 ? '#6a6a6a' : '#d8dcdf', 0.5); }
+    }
     if (this.arrive) {
       this.arrive.t = Math.min(1, this.arrive.t + dt / 1.8);
       const e = 1 - Math.pow(1 - this.arrive.t, 3);

@@ -207,6 +207,21 @@ class Sfx {
     this.tone(t, 660, 880, 0.07, 'square', 0.08);
   }
 
+  // ハンマーで車を叩いた「ガンッ」：低い衝撃＋鉄板が震える響き
+  clang(p = 1) {
+    if (!this.ac || !this.throttle('clang', 0.05)) return; const t = this.t;
+    this.tone(t, 110, 55, 0.35, 'sine', 0.8 * p);
+    this.nz(t, 0.06, 'highpass', 1800, 0.7, 0.7 * p);
+    this.nz(t, 0.18, 'bandpass', 700, 1.2, 0.55 * p, 300);
+    [283, 419, 677, 1045, 1590].forEach((f, i) => this.tone(t + 0.004, f * rand(0.97, 1.03), f * 0.985, rand(0.5, 1.0) / (1 + i * 0.35), 'sine', 0.09 * p / (1 + i * 0.4)));
+  }
+  // タイヤのパンク「プシューッ」
+  hiss() {
+    if (!this.ac) return; const t = this.t;
+    this.nz(t, 1.2, 'highpass', 3500, 0.6, 0.35, 5000, 0.02);
+    this.nz(t, 0.9, 'bandpass', 1800, 1.5, 0.15, 900, 0.05);
+  }
+
   // 電気がバチッとショートする音
   zap() {
     if (!this.ac || !this.throttle('zap', 0.08)) return; const t = this.t;
