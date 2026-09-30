@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609301434';
-import { sfx } from './audio.js?v=202609301434';
-import { Car } from './car.js?v=202609301434';
-import { PlateStack } from './plates.js?v=202609301434';
-import { Monitor } from './monitor.js?v=202609301434';
-import { Pane, Fixture, Swinger } from './props.js?v=202609301434';
-import { ScrapCar } from './scrapcar.js?v=202609301434';
-import { GiantVase } from './vase.js?v=202609301434';
-import { haptics } from './haptics.js?v=202609301434';
+import * as TX from './textures.js?v=202609301439';
+import { sfx } from './audio.js?v=202609301439';
+import { Car } from './car.js?v=202609301439';
+import { PlateStack } from './plates.js?v=202609301439';
+import { Monitor } from './monitor.js?v=202609301439';
+import { Pane, Fixture, Swinger } from './props.js?v=202609301439';
+import { ScrapCar } from './scrapcar.js?v=202609301439';
+import { GiantVase } from './vase.js?v=202609301439';
+import { haptics } from './haptics.js?v=202609301439';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1467,15 +1467,14 @@ export class World {
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx);
     geo.computeVertexNormals();
     const paper = new THREE.MeshStandardMaterial({ color: '#fbf8f0', roughness: 0.85, side: THREE.DoubleSide, flatShading: true });
-    g.add(new THREE.Mesh(geo, paper));
-    // 上の縁に赤い線
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(Wt + 0.004, 0.012, 0.036), this.mat('#e0453a', 0.7)); edge.position.y = y0 + L - 0.008; g.add(edge);
+    // じゃばらは前後に広げる（ハンマーと同じく、縦に振り下ろして叩く向き）
+    const fan = new THREE.Mesh(geo, paper); fan.rotation.y = Math.PI / 2 - 0.55; g.add(fan); // 少しだけ斜めにして、じゃばらの面も見えるように
     // 持ち手（紅白のテープ）
-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.2, 0.024), this.mat('#e0453a', 0.6)); grip.position.y = 0.0; g.add(grip);
-    for (const y of [-0.06, 0.0, 0.06]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.018, 0.026), this.mat('#ffffff', 0.6)); b.position.y = y; g.add(b); }
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.2, 0.05), this.mat('#e0453a', 0.6)); grip.position.y = 0.0; g.add(grip);
+    for (const y of [-0.06, 0.0, 0.06]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.018, 0.052), this.mat('#ffffff', 0.6)); b.position.y = y; g.add(b); }
     g.traverse(o => { o.castShadow = false; });
-    g.scale.setScalar(0.62);
-    g.userData.pose = { x: -0.6, z: 0.1 }; g.rotation.set(-0.6, 0, 0.1); // 少し前に倒して構える
+    g.scale.setScalar(0.7);
+    g.userData.pose = { x: 0.1, z: 0.25 }; g.rotation.set(0.1, 0, 0.25);
     return g;
   }
   makePiko() {
@@ -1485,10 +1484,10 @@ export class World {
     const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.38, 14), yel); handle.position.y = 0.14; g.add(handle);
     const pts = []; const R = 0.052, HL = 0.08;
     for (let k = 0; k <= 12; k++) { const y = -HL + (2 * HL) * k / 12; pts.push(new THREE.Vector2(R * (k % 2 ? 0.86 : 1), y)); }
-    const head = new THREE.Mesh(new THREE.LatheGeometry(pts, 28), red); head.rotation.z = Math.PI / 2; head.position.set(0, 0.35, 0); g.add(head); // 横向きにして、赤いじゃばらが見えるように
-    for (const z of [-HL - 0.012, HL + 0.012]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.04, R * 1.04, 0.026, 28), yel); c.rotation.z = Math.PI / 2; c.position.set(z, 0.35, 0); g.add(c); }
+    const head = new THREE.Mesh(new THREE.LatheGeometry(pts, 28), red); head.rotation.x = Math.PI / 2; head.position.set(0, 0.35, 0); g.add(head); // ハンマーと同じ向き（端で叩く）
+    for (const z of [-HL - 0.012, HL + 0.012]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.04, R * 1.04, 0.026, 28), yel); c.rotation.x = Math.PI / 2; c.position.set(0, 0.35, z); g.add(c); }
     g.traverse(o => { o.castShadow = false; });
-    g.userData.pose = { x: -0.05, z: 0.28 }; g.rotation.set(-0.05, 0, 0.28);
+    g.userData.pose = { x: 0.35, z: 0.3 }; g.rotation.set(0.35, 0, 0.3);
     return g;
   }
   makePan() {
