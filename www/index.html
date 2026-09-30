@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#121314">
+<meta name="description" content="スマホを振って、物を投げて壊す。叩いて割る。片付けはしなくていいストレス発散ゲーム。">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-Z7x0uGqYry32VWqvKTOezj2G9dZlMBJCP4JA4CjXh0A='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <title>それはあなたの本性です Demo v0.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,8 +95,6 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 #fade.on{opacity:1;pointer-events:auto}
 
 #notice{position:fixed;left:14px;right:66px;top:calc(var(--safe-t) + 12px);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.55;color:#ffd6c2}
-#debug{position:fixed;left:10px;top:calc(var(--safe-t) + 12px);background:rgba(0,0,0,.62);border-radius:8px;padding:8px 10px;font:12px/1.5 ui-monospace,Menlo,monospace;color:#d8f0d0;pointer-events:none;white-space:pre;font-variant-numeric:tabular-nums}
-#debug .bar{display:block;height:4px;background:var(--accent);margin-top:4px;border-radius:2px;width:0}
 #rotate{position:fixed;inset:0;background:var(--bg);display:none;place-items:center;text-align:center;padding:24px;font-weight:700;font-size:18px}
 @media (orientation:landscape) and (max-height:520px){#rotate{display:grid}}
 @media (prefers-reduced-motion:reduce){#pulse::after{animation:none}}
@@ -171,8 +172,6 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 .p-tile:active{background:#0b2a33;border-color:var(--neon2)}
 .p-resume{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px;background:var(--neon);border:0;border-radius:0;box-shadow:0 4px 0 #7a0012 !important;color:#fff;font-family:var(--f-dot);font-size:18px;box-shadow:0 0 18px rgba(255,43,61,.45)}
 .p-resume svg{width:18px;height:18px}
-.p-debug{display:flex;justify-content:space-between;align-items:center;background:none;border:0;padding:6px 4px 0;font-family:var(--f-dot);font-size:12px;color:#8a8590}
-.p-debug .toggle{transform:scale(.8)}
 #confirm.arcade-sheet .box{text-align:center;justify-items:center}
 #confirm .c-icon{width:54px;height:54px}
 #confirm.arcade-sheet p{font-family:var(--f-dot);font-weight:400}
@@ -235,7 +234,6 @@ body.holding #wheel,body.locked #wheel{opacity:.35;pointer-events:none}
   <p id="walkHint" hidden>左右にスワイプで、まわりを歩けます</p>
   <button id="menuBtn" type="button" aria-label="メニュー"><svg><use href="#i-menu"/></svg></button>
   <div id="notice" hidden></div>
-  <div id="debug" hidden></div>
 </div>
 
 <section id="titleScreen" class="arcade" aria-label="タイトル">
@@ -305,7 +303,6 @@ body.holding #wheel,body.locked #wheel{opacity:.35;pointer-events:none}
       <button class="p-tile" id="mStage" type="button"><svg><use href="#i-stage"/></svg><b>ステージを変える</b><small>ステージ選択にもどる</small></button>
     </div>
     <button class="p-resume" id="mClose" type="button"><svg><use href="#i-play"/></svg>つづける</button>
-    <button class="p-debug" id="mDebug" type="button" role="switch" aria-checked="false">調整用の数値を表示<span class="toggle"></span></button>
   </div>
 </div>
 
@@ -319,6 +316,6 @@ body.holding #wheel,body.locked #wheel{opacity:.35;pointer-events:none}
 <div id="fade"></div>
 <div id="rotate">縦向きで遊んでください</div>
 
-<script type="module" src="./js/main.js?v=202609301342"></script>
+<script type="module" src="./js/main.js?v=202609301352"></script>
 </body>
 </html>

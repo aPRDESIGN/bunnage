@@ -2,7 +2,7 @@
   "name": "bunnage",
   "version": "0.1.0",
   "private": true,
-  "description": "ぶん投げ部屋 Demo v0.1 — スマホを振って物を投げて壊す体感型ストレス発散ゲーム",
+  "description": "それはあなたの本性です Demo v0.1 — スマホを振って物を投げて壊す体感型ストレス発散ゲーム",
   "scripts": {
     "serve": "npx http-server www -p 8080 -c-1",
     "ios": "npx cap sync ios && npx cap open ios"

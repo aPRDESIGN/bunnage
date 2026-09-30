@@ -1,7 +1,7 @@
-import { World, STAGE_ITEMS, ITEM_NAMES, TOOLS } from './world.js?v=202609301342';
-import { SwingDetector } from './motion.js?v=202609301342';
-import { sfx } from './audio.js?v=202609301342';
-import { haptics, hapticSettings } from './haptics.js?v=202609301342';
+import { World, STAGE_ITEMS, ITEM_NAMES, TOOLS } from './world.js?v=202609301352';
+import { SwingDetector } from './motion.js?v=202609301352';
+import { sfx } from './audio.js?v=202609301352';
+import { haptics, hapticSettings } from './haptics.js?v=202609301352';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -15,7 +15,8 @@ const store = {
 
 const world = new World($('#view'));
 const det = new SwingDetector();
-window.__bunnage = { world, det }; // 調整用
+// 開発中（自分のPCで動かしているとき）だけ、テスト用に中身を触れるようにする
+if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__bunnage = { world, det };
 
 function resize() { world.resize(window.innerWidth, window.innerHeight); }
 window.addEventListener('resize', resize); resize();
@@ -27,7 +28,6 @@ let holding = false, holdEnding = false;
 let lockUntil = 0;           // 投擲完了までカメラとUIをロック
 let permAsked = false;
 let lastThrow = null;
-let debugOn = false;
 
 // ---------------- 画面遷移 ----------------
 function show(id) {
@@ -365,8 +365,6 @@ $('#menuBtn').addEventListener('click', () => {
 });
 $('#mClose').addEventListener('click', () => { $('#menu').hidden = true; });
 $('#menu').addEventListener('click', (e) => { if (e.target === $('#menu')) $('#menu').hidden = true; });
-function sw(el, on) { el.setAttribute('aria-checked', on ? 'true' : 'false'); }
-$('#mDebug').addEventListener('click', () => { debugOn = !debugOn; sw($('#mDebug'), debugOn); $('#debug').hidden = !debugOn; });
 $('#mClean').addEventListener('click', () => { $('#menu').hidden = true; $('#confirm').hidden = false; });
 $('#cCancel').addEventListener('click', () => { $('#confirm').hidden = true; });
 $('#cOk').addEventListener('click', () => {
@@ -376,21 +374,6 @@ $('#cOk').addEventListener('click', () => {
 });
 $('#mStage').addEventListener('click', () => { $('#menu').hidden = true; endHold(); show(world.stageType === 'hammer' ? 'hammer' : 'stage'); });
 
-// ---------------- 調整用の表示 ----------------
-function renderDebug() {
-  const d = det.debug;
-  const t = lastThrow;
-  const lines = [
-    `センサー  ${det.hasMotion ? 'OK' : 'なし'}  姿勢 ${det.orientOK ? 'OK' : 'なし'}  符号 ${det.signFix}`,
-    `加速度 ${d.acc.toFixed(1).padStart(5)} m/s²  回転 ${Math.round(d.rot).toString().padStart(4)} °/s`,
-    `状態 ${holding ? (det.swinging ? 'スイング中' : det.armed ? 'HOLD' : 'HOLD（補充待ち）') : '待機'}`,
-    t ? `前回 ${t.cls}  速さ ${t.speed.toFixed(2)} m/s  強さ ${(t.power * 100) | 0}` : '前回 —',
-    t ? `方向 左右 ${Math.round(t.yaw / D2R)}°  上下 ${Math.round(t.pitch / D2R)}°` : '',
-    `振動 ${haptics.kind}`
-  ];
-  $('#debug').innerHTML = lines.join('\n') + `<span class="bar" style="width:${Math.min(100, d.acc / 25 * 100)}%"></span>`;
-}
-
 // ---------------- ループ ----------------
 let prev = performance.now();
 function frame(now) {
@@ -399,7 +382,6 @@ function frame(now) {
   if (holding && !det.armed && world.handReady && now > lockUntil) { det.arm(); haptics.hold(); }
   if (!holding && now > lockUntil) document.body.classList.remove('locked');
   if (mode === 'play') world.update(dt); // メニュー中は3Dを止める（画面は不透明）
-  if (debugOn && mode === 'play') renderDebug();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
