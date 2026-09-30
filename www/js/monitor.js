@@ -1,9 +1,9 @@
 // PCのモニター：机の上。画面を叩くとひびと液晶のにじみ、3回で画面が割れる。さらに叩くと机から落ちる
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import * as TX from './textures.js?v=202609300453';
-import { sfx } from './audio.js?v=202609300453';
-import { haptics } from './haptics.js?v=202609300453';
+import * as TX from './textures.js?v=202609300508';
+import { sfx } from './audio.js?v=202609300508';
+import { haptics } from './haptics.js?v=202609300508';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -184,6 +184,8 @@ export class Monitor {
     const W = this.world;
     if (this.toppled) return;
     this.toppled = true; this.toppleAt = W.clock;
+    const c = this.center;
+    W.clearDebrisIn(new THREE.Vector3(c.x - 0.45, c.y + 0.012, c.z - 0.3), new THREE.Vector3(c.x + 0.45, c.y + 0.9, c.z + 0.12));
     for (const b of this.bodies) if (b.world) W.physics.removeBody(b);
     this.bodies = [];
     for (const p of this.pieces) p.attached = false;
@@ -194,13 +196,25 @@ export class Monitor {
       [new CANNON.Box(new CANNON.Vec3(0.13, 0.007, 0.1)), new CANNON.Vec3(0, 0.007, -0.02)]
     ];
     const pos = this.group.position.clone(); pos.y += 0.003;
-    const b = W.addDynamic(this.group, shapes, 5, pos, { kind: 'monitorBody' }, { sleep: false });
+    const b = this.body = W.addDynamic(this.group, shapes, 5, pos, { kind: 'monitorBody' }, { sleep: false });
     const flat = new THREE.Vector3(dir.x, 0, dir.z).normalize();
     b.velocity.set(flat.x * (1.2 + v * 0.08), 1.0, flat.z * (1.2 + v * 0.08));
     const axis = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), flat).normalize();
     b.angularVelocity.set(axis.x * 5, rand(-1, 1), axis.z * 5);
     sfx.knock(9, 0.5);
     setTimeout(() => { sfx.metal(5); sfx.knock(10, 0.4); }, 420);
+  }
+
+  // 次のモニターを置く前に、落ちた古いモニターを片付ける
+  dispose() {
+    const W = this.world;
+    if (this.body) {
+      const p = this.body.position;
+      W.clearDebrisIn(new THREE.Vector3(p.x - 0.6, p.y - 0.05, p.z - 0.6), new THREE.Vector3(p.x + 0.6, p.y + 0.8, p.z + 0.6));
+      if (this.body.world) W.physics.removeBody(this.body);
+      W.dyn = W.dyn.filter(r => r.body !== this.body);
+    }
+    this.group.parent && this.group.parent.remove(this.group);
   }
 
   collapseAll() { if (!this.toppled) this._topple(new THREE.Vector3(0, 0, -1), 6); }

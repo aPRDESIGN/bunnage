@@ -2,13 +2,13 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609300453';
-import { sfx } from './audio.js?v=202609300453';
-import { Car } from './car.js?v=202609300453';
-import { PlateStack } from './plates.js?v=202609300453';
-import { Monitor } from './monitor.js?v=202609300453';
-import { GiantVase } from './vase.js?v=202609300453';
-import { haptics } from './haptics.js?v=202609300453';
+import * as TX from './textures.js?v=202609300508';
+import { sfx } from './audio.js?v=202609300508';
+import { Car } from './car.js?v=202609300508';
+import { PlateStack } from './plates.js?v=202609300508';
+import { Monitor } from './monitor.js?v=202609300508';
+import { GiantVase } from './vase.js?v=202609300508';
+import { haptics } from './haptics.js?v=202609300508';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -53,6 +53,18 @@ class Debris {
     this.mesh.geometry.dispose(); this.mesh.geometry = g; this.dirty = false;
   }
   clear() { this.pos = []; this.nor = []; this.col = []; this.dirty = true; this.flush(); }
+  // 箱の中にある三角形を取り除く（支えが無くなった所の破片が宙に浮かないように）
+  removeIn(min, max) {
+    const P = this.pos, N = this.nor, C = this.col, np = [], nn = [], nc = [];
+    let removed = 0;
+    for (let i = 0; i < P.length; i += 9) {
+      const cx = (P[i] + P[i + 3] + P[i + 6]) / 3, cy = (P[i + 1] + P[i + 4] + P[i + 7]) / 3, cz = (P[i + 2] + P[i + 5] + P[i + 8]) / 3;
+      if (cx > min.x && cx < max.x && cy > min.y && cy < max.y && cz > min.z && cz < max.z) { removed++; continue; }
+      for (let k = 0; k < 9; k++) { np.push(P[i + k]); nn.push(N[i + k]); nc.push(C[i + k]); }
+    }
+    if (removed) { this.pos = np; this.nor = nn; this.col = nc; this.dirty = true; }
+    return removed;
+  }
 }
 
 // 破片1枚のジオメトリ（不規則な三角形の薄板）
@@ -178,7 +190,7 @@ export class World {
     this.fridgeFront = null;
     this.vases = []; this.vaseSlots = [];
     this.car = null;
-    this.orbitA = 0; this.hammerAnim = null;
+    this.orbitA = 0; this.hammerAnim = null; this.orbitC = null;
     this.headLamp.intensity = this.stageType === 'hammer' ? 1.4 : 0;
     if (this.stageType === 'warehouse') this._warehouse();
     else if (this.stageType === 'hammer') this._hammerRoom();
@@ -278,37 +290,26 @@ export class World {
   }
 
   // ================ 倉庫と巨大な壺 =================
-  // ハンマー：倉庫に3つの持ち場（左：皿の山、真ん中：壺か石の甕、右：机のモニター）。
-  // 選んだ物のすぐそばに立ち、左右のスワイプでそのまわりを歩く
+  // ハンマー：1つのステージに叩く物は1種類だけ。そのすぐそばに立ち、左右のスワイプでまわりを歩く
   _hammerRoom() {
-    this._warehouse([
-      { x: -2.7, opts: { type: 'plates' }, furniture: 'table' },
-      { x: 0, opts: { style: 'sometsuke', finishHits: 3 } },
-      { x: 2.7, opts: { type: 'monitor' }, furniture: 'desk' }
-    ]);
-    this.hammerSpots = {
-      vase: { slot: 1, r: 2.2, pitch: -0.2 }, stone: { slot: 1, r: 2.2, pitch: -0.2 },
-      plates: { slot: 0, r: 1.3, pitch: -0.42 }, monitor: { slot: 2, r: 1.2, pitch: -0.3 }
-    };
-    this.orbitC = new THREE.Vector3(0, 0, -2.3); this.orbitR = 2.2;
-    this.orbitGoal = { c: this.orbitC.clone(), r: 2.2 };
+    const K = {
+      plates: { opts: { type: 'plates' }, furniture: 'table', r: 1.3, pitch: -0.42 },
+      vase: { opts: { style: 'sometsuke', finishHits: 3 }, r: 2.2, pitch: -0.2 },
+      stone: { opts: { style: 'stone', tough: true, finishHits: 8 }, r: 2.2, pitch: -0.2 },
+      monitor: { opts: { type: 'monitor' }, furniture: 'desk', r: 1.2, pitch: -0.3 }
+    }[this.hammerKind] || null;
+    const k = K || { opts: { style: 'sometsuke', finishHits: 3 }, r: 2.2, pitch: -0.2 };
+    this._warehouse([{ x: 0, opts: k.opts, furniture: k.furniture }]);
+    this.orbitC = new THREE.Vector3(0, 0, -2.3); this.orbitR = k.r; this.hammerPitch = k.pitch;
     const top = new THREE.PointLight('#fff2dc', 7, 6, 2); top.position.set(-0.6, 3.4, -2.8); this.stage.add(top);
     const back = new THREE.PointLight('#aebfd6', 4, 6, 2); back.position.set(0.8, 2.2, -4.6); this.stage.add(back);
   }
-  // 叩く物を選ぶ：その物のところへ歩いていく。壺と石の甕は同じ台なので入れ替える
-  setHammerTarget(t) {
-    const spot = this.hammerSpots && this.hammerSpots[t]; if (!spot) return;
-    const slot = this.vaseSlots[spot.slot];
-    this.orbitGoal = { c: new THREE.Vector3(slot.center.x, 0, slot.center.z), r: spot.r };
-    this.orbitA = 0; this.yaw = 0; this.pitch = spot.pitch;
-    if (t === 'vase' || t === 'stone') {
-      const want = t === 'stone';
-      if (!!slot.opts.tough === want) return;
-      slot.opts = want ? { style: 'stone', tough: true, finishHits: 8 } : { style: 'sometsuke', finishHits: 3 };
-      if (slot.pending) return;
-      if (slot.vase && !slot.vase.drop) slot.vase.collapseAll();
-      this._respawn(slot, 900);
-    }
+  // 支えが無くなった所に積もっていた破片を消す
+  clearDebrisIn(min, max) {
+    this.debrisSolid.removeIn(min, max); this.debrisGlass.removeIn(min, max);
+    // 止まっていた破片や物も、支えが無くなったら落ちるように起こす
+    const bx = new THREE.Box3(min.clone().addScalar(-0.1), max.clone().addScalar(0.1)), v = new THREE.Vector3();
+    for (const b of [...this.shards, ...this.dyn.map(r => r.body)]) if (b.world && b.sleepState !== 0 && bx.containsPoint(v.set(b.position.x, b.position.y, b.position.z))) b.wakeUp();
   }
   _makeTarget(center, opts) {
     if (opts.type === 'plates') return new PlateStack(this, center, opts);
@@ -318,8 +319,10 @@ export class World {
   _respawn(slot, delay) {
     slot.pending = true;
     const stageNow = this.stage;
+    const old = slot.vase;
     setTimeout(() => {
       if (this.stage !== stageNow) return;
+      if (old && old.dispose) old.dispose();
       if (slot.cycle && !slot.opts.tough && !slot.opts.type) { const st = ['sometsuke', 'seiji', 'kuro']; slot.opts.style = st[(st.indexOf(slot.opts.style) + 1) % 3]; }
       slot.vase = this._makeTarget(slot.center, { ...slot.opts, drop: true });
       this.vases.push(slot.vase); slot.pending = false;
@@ -1416,7 +1419,6 @@ export class World {
     }
 
     if (this.stageType === 'hammer' && this.orbitC) {
-      if (this.orbitGoal) { const k = 1 - Math.exp(-dt * 5); this.orbitC.lerp(this.orbitGoal.c, k); this.orbitR += (this.orbitGoal.r - this.orbitR) * k; }
       const c = this.orbitC, r = this.orbitR;
       this.camera.position.set(c.x + Math.sin(this.orbitA) * r, EYE.y, c.z + Math.cos(this.orbitA) * r);
       this.camera.rotation.set(this.pitch, this.orbitA + this.yaw, 0, 'YXZ');

@@ -2,9 +2,9 @@
 // 当たった周りのかけらだけを外す。支えを失ったかけらは崩れ落ちる。
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { sfx } from './audio.js?v=202609300453';
-import { haptics } from './haptics.js?v=202609300453';
-import * as TX from './textures.js?v=202609300453';
+import { sfx } from './audio.js?v=202609300508';
+import { haptics } from './haptics.js?v=202609300508';
+import * as TX from './textures.js?v=202609300508';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -285,6 +285,8 @@ export class GiantVase {
     if (!p.attached) return;
     const W = this.world;
     p.attached = false; this.detached++;
+    const bp = p.bodyPos, m = Math.max(p.w, p.h) / 2 + 0.08;
+    W.clearDebrisIn(new THREE.Vector3(bp.x - m, Math.max(0.35, bp.y - m), bp.z - m), new THREE.Vector3(bp.x + m, bp.y + m + 0.1, bp.z + m));
     if (p.body && p.body.world) W.physics.removeBody(p.body);
     const mesh = p.mesh;
     mesh.updateMatrixWorld(true);

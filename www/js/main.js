@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300453';
-import { SwingDetector } from './motion.js?v=202609300453';
-import { sfx } from './audio.js?v=202609300453';
-import { haptics, hapticSettings } from './haptics.js?v=202609300453';
+import { World } from './world.js?v=202609300508';
+import { SwingDetector } from './motion.js?v=202609300508';
+import { sfx } from './audio.js?v=202609300508';
+import { haptics, hapticSettings } from './haptics.js?v=202609300508';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -32,38 +32,36 @@ let debugOn = false;
 function show(id) {
   $('#stageScreen').hidden = id !== 'stage';
   $('#itemScreen').hidden = id !== 'item';
+  $('#hammerScreen').hidden = id !== 'hammer';
   $('#hud').hidden = id !== 'play';
   mode = id;
 }
 
 const TUT_THROW = 'ここを押さえたまま、<br>スマホを振ってみよう';
 const TUT_HAMMER = 'ここを押さえたまま、<br>スマホを振り下ろしてみよう';
-async function enterStage(type) {
+async function enterStage(type, hammerKind) {
   sfx.unlock();
   if (!permAsked) { permAsked = true; await det.requestPermission(); det.start(); }
+  if (hammerKind) world.hammerKind = hammerKind;
   world.reset(type);
-  world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.24 : type === 'hammer' ? -0.2 : -0.12;
+  world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.24 : type === 'hammer' ? world.hammerPitch : -0.12;
   const hammer = type === 'hammer';
-  $('#itemBtn').hidden = hammer; $('#targetBar').hidden = !hammer; $('#walkHint').hidden = !hammer;
+  $('#itemBtn').hidden = hammer; $('#walkHint').hidden = !hammer;
   $('#tutorial').innerHTML = hammer ? TUT_HAMMER : TUT_THROW;
   if (hammer) {
     // 手に持つのはハンマーだけ。アイテム選択は飛ばす
     item = 'hammer'; world.equip('hammer');
-    setTarget('vase', false);
     show('play');
     if (!store.get('bunnage_tut_hammer')) $('#tutorial').hidden = false;
     setTimeout(checkSensors, 1500);
   } else show('item');
 }
-function setTarget(t, apply = true) {
-  document.querySelectorAll('#targetBar button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
-  if (apply) { world.setHammerTarget(t); haptics.tick(); }
-}
-document.querySelectorAll('#targetBar button').forEach(b => b.addEventListener('click', () => { if (!b.classList.contains('on')) setTarget(b.dataset.t); }));
+document.querySelectorAll('#hammerScreen [data-hk]').forEach(b => b.addEventListener('click', () => enterStage('hammer', b.dataset.hk)));
+$('#hammerBack').addEventListener('click', () => show('stage'));
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));
 $('#stageWarehouse').addEventListener('click', () => enterStage('warehouse'));
 $('#stageCar').addEventListener('click', () => enterStage('car'));
-$('#stageHammer').addEventListener('click', () => enterStage('hammer'));
+$('#stageHammer').addEventListener('click', () => { sfx.unlock(); show('hammer'); });
 if (/[?&]car\b/.test(location.search)) $('#stageCar').hidden = false; // 隠しステージ
 
 document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {
@@ -242,7 +240,7 @@ $('#cCancel').addEventListener('click', () => { $('#confirm').hidden = true; });
 $('#cOk').addEventListener('click', () => {
   $('#confirm').hidden = true;
   const f = $('#fade'); f.classList.add('on');
-  setTimeout(() => { world.reset(); world.equip(item); if (world.stageType === 'hammer') setTarget('vase', false); setTimeout(() => f.classList.remove('on'), 120); }, 320);
+  setTimeout(() => { world.reset(); world.equip(item); setTimeout(() => f.classList.remove('on'), 120); }, 320);
 });
 $('#mStage').addEventListener('click', () => { $('#menu').hidden = true; endHold(); show('stage'); });
 

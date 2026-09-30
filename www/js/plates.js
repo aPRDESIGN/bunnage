@@ -1,8 +1,8 @@
 // 皿の山：テーブルの上に積んだ白い皿。叩いた所の皿は割れ、その上に積まれていた皿は崩れ落ちて床で割れる
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { sfx } from './audio.js?v=202609300453';
-import { haptics } from './haptics.js?v=202609300453';
+import { sfx } from './audio.js?v=202609300508';
+import { haptics } from './haptics.js?v=202609300508';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -35,6 +35,8 @@ export class PlateStack {
       world.physics.addBody(b);
       return { body: b, dx, dz, s };
     });
+    // 新しく積む場所に残っていた破片は片付ける
+    world.clearDebrisIn(new THREE.Vector3(base.x - 0.6, base.y + 0.004, base.z - 0.32), new THREE.Vector3(base.x + 0.75, base.y + 2, base.z + 0.3));
     this.drop = opts.drop ? { t: 0 } : null;
     if (this.drop) for (const p of this.pieces) p.mesh.position.y = p.pos.y + 1.4 + p.level * 0.05;
   }
@@ -47,6 +49,8 @@ export class PlateStack {
     const c = this.colBodies[s]; const W = this.world;
     if (c.body.world) W.physics.removeBody(c.body);
     let top = -1; for (const p of this.pieces) if (p.stack === s && p.attached) top = Math.max(top, p.level);
+    const cx = this.center.x + c.dx, cz = this.center.z + c.dz, ty = this.center.y + (top + 1) * PH;
+    W.clearDebrisIn(new THREE.Vector3(cx - 0.2, ty + 0.004, cz - 0.2), new THREE.Vector3(cx + 0.2, ty + 2, cz + 0.2));
     if (top < 0) return;
     const h = (top + 1) * PH;
     const b = new CANNON.Body({ mass: 0, material: W.matDefault });
