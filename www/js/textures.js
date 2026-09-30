@@ -375,3 +375,118 @@ export const parkingSign = () => make('psign', 128, 128, (g, w, h) => {
   g.fillStyle = '#1f4fa3'; g.fillRect(0, 0, w, h);
   g.fillStyle = '#fff'; g.font = 'bold 96px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', w / 2, h / 2 + 6);
 });
+
+// ================= ハンマーの部屋用 =================
+// 美術館：磨いた石の床（1枚で1.2m角）
+export const marble = (rx, ry) => make('marble', 512, 512, (g, w, h) => {
+  g.fillStyle = '#d9d6cf'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 30; i++) { const x = rnd() * w, y = rnd() * h, r = 40 + rnd() * 140; const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, `rgba(${rnd() < .5 ? '120,115,105' : '255,255,255'},${.05 + rnd() * .08})`); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  g.lineCap = 'round';
+  for (let k = 0; k < 7; k++) {
+    g.strokeStyle = `rgba(90,85,78,${.12 + rnd() * .2})`; g.lineWidth = .6 + rnd() * 1.6;
+    let x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y);
+    for (let s = 0; s < 14; s++) { x += (rnd() - .3) * 60; y += (rnd() - .5) * 50; g.lineTo(x, y); }
+    g.stroke();
+  }
+  noise(g, w, h, 6000, .05);
+  g.fillStyle = 'rgba(60,55,50,.35)'; g.fillRect(0, 0, w, 2); g.fillRect(0, 0, 2, h);
+}, { repeat: [rx, ry] });
+
+// 美術館の壁に掛ける抽象画（架空）
+export const painting = (i) => make('paint' + i, 256, 320, (g, w, h) => {
+  const pal = [['#1d2a3a', '#c9472e', '#e8d9b5', '#3f6f8f'], ['#e9e2d0', '#2b2b2b', '#b8322a', '#d9a441'], ['#23321f', '#8fb07a', '#e0d2a8', '#6b3f2a'], ['#3a2233', '#d98c6a', '#f1e6d2', '#4c7a8c']][i % 4];
+  g.fillStyle = pal[0]; g.fillRect(0, 0, w, h);
+  for (let k = 0; k < 9; k++) {
+    g.fillStyle = pal[1 + (k % 3)]; g.globalAlpha = .55 + rnd() * .4;
+    if (rnd() < .5) { g.beginPath(); g.arc(rnd() * w, rnd() * h, 20 + rnd() * 70, 0, 7); g.fill(); }
+    else { g.save(); g.translate(rnd() * w, rnd() * h); g.rotate(rnd() * 3); g.fillRect(-60, -10, 60 + rnd() * 100, 10 + rnd() * 40); g.restore(); }
+  }
+  g.globalAlpha = 1;
+  g.strokeStyle = 'rgba(0,0,0,.25)'; for (let k = 0; k < 60; k++) { g.beginPath(); const x = rnd() * w, y = rnd() * h; g.moveTo(x, y); g.lineTo(x + rnd() * 30 - 15, y + rnd() * 30 - 15); g.stroke(); }
+  noise(g, w, h, 3000, .08);
+});
+
+// 展示の説明パネル
+export const caption = (title, sub) => make('cap' + title, 256, 128, (g, w, h) => {
+  g.fillStyle = '#f3f0e8'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#222'; g.font = 'bold 26px serif'; g.fillText(title, 18, 42);
+  g.fillStyle = '#555'; g.font = '15px serif'; g.fillText(sub, 18, 72);
+  g.fillStyle = '#9b2a22'; g.font = 'bold 14px sans-serif'; g.fillText('作品に手を触れないでください', 18, 108);
+});
+
+// 非常口（緑の誘導灯・架空の簡略版）
+export const exitSign = () => make('exit', 256, 96, (g, w, h) => {
+  g.fillStyle = '#1f9a55'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#eafff2'; g.fillRect(14, 14, 60, 68);
+  g.fillStyle = '#1f9a55'; g.beginPath(); g.arc(44, 28, 7, 0, 7); g.fill(); g.fillRect(38, 38, 12, 24);
+  g.fillStyle = '#eafff2'; g.font = 'bold 44px sans-serif'; g.fillText('EXIT', 96, 64);
+});
+
+// オフィス：タイルカーペット（1枚で1m角）
+export const carpet = (rx, ry) => make('carpet', 256, 256, (g, w, h) => {
+  for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) {
+    g.fillStyle = (x + y) % 2 ? '#454b55' : '#3e444d'; g.fillRect(x * 128, y * 128, 128, 128);
+    g.strokeStyle = 'rgba(255,255,255,.035)';
+    for (let k = 0; k < 128; k += 4) { g.beginPath(); if ((x + y) % 2) { g.moveTo(x * 128 + k, y * 128); g.lineTo(x * 128 + k, y * 128 + 128); } else { g.moveTo(x * 128, y * 128 + k); g.lineTo(x * 128 + 128, y * 128 + k); } g.stroke(); }
+  }
+  noise(g, w, h, 9000, .12);
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 127, w, 2); g.fillRect(127, 0, 2, h);
+}, { repeat: [rx, ry] });
+
+// 天井のシステム天井（60cm角）
+export const ceilPanel = (rx, ry) => make('ceilp', 128, 128, (g, w, h) => {
+  g.fillStyle = '#cfcdc6'; g.fillRect(0, 0, w, h); noise(g, w, h, 1500, .08);
+  g.fillStyle = '#9d9b94'; g.fillRect(0, 0, w, 3); g.fillRect(0, 0, 3, h);
+}, { repeat: [rx, ry] });
+
+// 夜の窓（ブラインド越しのビルの明かり）
+export const nightBlinds = () => make('blinds', 512, 256, (g, w, h) => {
+  g.fillStyle = '#0b1320'; g.fillRect(0, 0, w, h);
+  for (let b = 0; b < 14; b++) {
+    const bx = rnd() * w, bw = 30 + rnd() * 70, top = h * (.15 + rnd() * .5);
+    g.fillStyle = '#121c2c'; g.fillRect(bx, top, bw, h - top);
+    for (let y = top + 6; y < h; y += 9) for (let x = bx + 4; x < bx + bw - 4; x += 8) if (rnd() < .28) { g.fillStyle = rnd() < .8 ? '#e9d9a4' : '#a9d3ff'; g.globalAlpha = .5 + rnd() * .5; g.fillRect(x, y, 4, 4); g.globalAlpha = 1; }
+  }
+  for (let y = 0; y < h; y += 10) { g.fillStyle = 'rgba(200,205,212,.28)'; g.fillRect(0, y, w, 5); }
+});
+
+// ホワイトボード（締切前）
+export const whiteboard = () => make('wboard', 512, 256, (g, w, h) => {
+  g.fillStyle = '#f4f6f6'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#2b4fa0'; g.lineWidth = 3; g.font = 'bold 30px sans-serif'; g.fillStyle = '#2b4fa0';
+  g.fillText('今週のタスク', 24, 44);
+  g.font = '20px sans-serif';
+  ['・資料 修正（3回目）', '・見積 再提出', '・定例MTG 準備', '・議事録…'].forEach((t, i) => g.fillText(t, 30, 86 + i * 32));
+  g.fillStyle = '#c62b2b'; g.font = 'bold 42px sans-serif'; g.fillText('締切!!', 330, 110);
+  g.strokeStyle = '#c62b2b'; g.beginPath(); g.ellipse(390, 96, 90, 38, -.1, 0, 7); g.stroke();
+  g.strokeStyle = '#1e7a45'; g.beginPath(); g.moveTo(300, 220); g.lineTo(360, 180); g.lineTo(400, 200); g.lineTo(470, 140); g.stroke();
+  noise(g, w, h, 800, .04);
+});
+
+// レストランの厨房：白黒の市松の床（1枚で60cm角）
+export const checker = (rx, ry) => make('checker', 256, 256, (g, w, h) => {
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) { g.fillStyle = (x + y) % 2 ? '#2a2a2a' : '#e8e6df'; g.fillRect(x * 64, y * 64, 64, 64); }
+  noise(g, w, h, 6000, .1);
+  g.fillStyle = 'rgba(0,0,0,.25)'; for (let i = 0; i <= 4; i++) { g.fillRect(i * 64 - 1, 0, 2, h); g.fillRect(0, i * 64 - 1, w, 2); }
+}, { repeat: [rx, ry] });
+
+// 厨房の壁：白いサブウェイタイル（1枚で60cm×30cm）
+export const subway = (rx, ry) => make('subway', 256, 128, (g, w, h) => {
+  g.fillStyle = '#bdbab2'; g.fillRect(0, 0, w, h);
+  for (let r = 0; r < 4; r++) for (let c = -1; c < 5; c++) {
+    const x = c * 64 + (r % 2 ? 32 : 0) + 2, y = r * 32 + 2;
+    const gr = g.createLinearGradient(x, y, x, y + 28); gr.addColorStop(0, '#fbfaf6'); gr.addColorStop(1, '#e6e3dc');
+    g.fillStyle = gr; g.fillRect(x, y, 60, 28);
+  }
+  noise(g, w, h, 1500, .04);
+}, { repeat: [rx, ry] });
+
+// 黒板のメニュー
+export const menuBoard = () => make('menub', 256, 320, (g, w, h) => {
+  g.fillStyle = '#1f2a24'; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(255,255,255,.88)'; g.font = 'bold 28px sans-serif'; g.fillText('本日のおすすめ', 22, 48);
+  g.font = '19px sans-serif';
+  ['ハンバーグ定食', 'オムライス', 'ナポリタン', '日替わりパスタ', '食後のコーヒー'].forEach((t, i) => { g.fillText(t, 26, 98 + i * 40); g.fillText('¥' + (780 + i * 60), 180, 98 + i * 40); });
+  g.fillStyle = '#e6b54a'; g.fillText('本日貸切', 70, 300);
+  noise(g, w, h, 4000, .12, false);
+});

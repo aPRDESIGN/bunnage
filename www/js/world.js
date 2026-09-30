@@ -2,13 +2,13 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609300517';
-import { sfx } from './audio.js?v=202609300517';
-import { Car } from './car.js?v=202609300517';
-import { PlateStack } from './plates.js?v=202609300517';
-import { Monitor } from './monitor.js?v=202609300517';
-import { GiantVase } from './vase.js?v=202609300517';
-import { haptics } from './haptics.js?v=202609300517';
+import * as TX from './textures.js?v=202609300610';
+import { sfx } from './audio.js?v=202609300610';
+import { Car } from './car.js?v=202609300610';
+import { PlateStack } from './plates.js?v=202609300610';
+import { Monitor } from './monitor.js?v=202609300610';
+import { GiantVase } from './vase.js?v=202609300610';
+import { haptics } from './haptics.js?v=202609300610';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -290,20 +290,193 @@ export class World {
   }
 
   // ================ 倉庫と巨大な壺 =================
-  // ハンマー：1つのステージに叩く物は1種類だけ。そのすぐそばに立ち、左右のスワイプでまわりを歩く
+  // ハンマー：1つのステージに叩く物は1種類だけ。物ごとに部屋が違う
+  //  皿の山→閉店後のレストランの厨房、壺・石の甕→夜の美術館、モニター→深夜のオフィス
   _hammerRoom() {
     const K = {
-      plates: { opts: { type: 'plates' }, furniture: 'table', r: 1.3, pitch: -0.42 },
-      vase: { opts: { style: 'sometsuke', finishHits: 3 }, r: 2.2, pitch: -0.2 },
-      stone: { opts: { style: 'stone', tough: true, finishHits: 8 }, r: 2.2, pitch: -0.2 },
-      monitor: { opts: { type: 'monitor' }, furniture: 'desk', r: 1.2, pitch: -0.3 }
-    }[this.hammerKind] || null;
-    const k = K || { opts: { style: 'sometsuke', finishHits: 3 }, r: 2.2, pitch: -0.2 };
-    this._warehouse([{ x: 0, opts: k.opts, furniture: k.furniture }]);
-    this.orbitC = new THREE.Vector3(0, 0, -2.3); this.orbitR = k.r; this.hammerPitch = k.pitch;
-    const top = new THREE.PointLight('#fff2dc', 7, 6, 2); top.position.set(-0.6, 3.4, -2.8); this.stage.add(top);
-    const back = new THREE.PointLight('#aebfd6', 4, 6, 2); back.position.set(0.8, 2.2, -4.6); this.stage.add(back);
+      plates: { opts: { type: 'plates' }, room: 'restaurant', furniture: 'steel', r: 1.3, pitch: -0.42 },
+      vase: { opts: { style: 'sometsuke', finishHits: 3 }, room: 'museum', r: 2.6, pitch: -0.12 },
+      stone: { opts: { style: 'stone', tough: true, finishHits: 8 }, room: 'museum', r: 2.6, pitch: -0.12 },
+      monitor: { opts: { type: 'monitor' }, room: 'office', furniture: 'desk', r: 1.2, pitch: -0.3 }
+    }[this.hammerKind] || { opts: { style: 'sometsuke', finishHits: 3 }, room: 'museum', r: 2.2, pitch: -0.2 };
+    const C = new THREE.Vector3(0, 0, -2.3);
+    if (K.room === 'museum') this._museum(C, this.hammerKind === 'stone');
+    else if (K.room === 'office') this._office(C);
+    else this._restaurant(C);
+    const center = C.clone();
+    if (K.furniture) center.y = this._furniture(K.furniture, C.x, C.z);
+    else center.y = 0.14;
+    const slot = { center, opts: { ...K.opts }, vase: null, pending: false, cycle: true };
+    this.vaseSlots = [slot];
+    slot.vase = this._makeTarget(center, { ...slot.opts }); this.vases.push(slot.vase);
+    this.orbitC = C.clone(); this.orbitR = K.r; this.hammerPitch = K.pitch;
   }
+
+  // 床・壁・天井（すり抜けないよう当たり判定は厚め）
+  _shell(X, Z0, Z1, Hh, floorMat, wallMat, ceilMat) {
+    const W = X * 2, D = Z1 - Z0, T = 1.0, cz = (Z0 + Z1) / 2;
+    const f = this.box(W, 0.1, D, 0, -0.05, cz, floorMat, { surface: 'floor', pd: [W + 2, T, D + 2], pp: [0, -T / 2, cz] }); f.userData.surface = 'floor';
+    const walls = [
+      this.box(W, Hh, 0.1, 0, Hh / 2, Z0 - 0.05, wallMat, { surface: 'wall', pd: [W + 2, Hh + 2, T], pp: [0, Hh / 2, Z0 - T / 2] }),
+      this.box(W, Hh, 0.1, 0, Hh / 2, Z1 + 0.05, wallMat, { surface: 'wall', pd: [W + 2, Hh + 2, T], pp: [0, Hh / 2, Z1 + T / 2] }),
+      this.box(0.1, Hh, D, -X - 0.05, Hh / 2, cz, wallMat, { surface: 'wall', pd: [T, Hh + 2, D + 2], pp: [-X - T / 2, Hh / 2, cz] }),
+      this.box(0.1, Hh, D, X + 0.05, Hh / 2, cz, wallMat, { surface: 'wall', pd: [T, Hh + 2, D + 2], pp: [X + T / 2, Hh / 2, cz] })
+    ];
+    walls.forEach(w => { w.userData.surface = 'wall'; });
+    this.box(W, 0.1, D, 0, Hh + 0.05, cz, ceilMat, { surface: 'wall', pd: [W + 2, T, D + 2], pp: [0, Hh + T / 2, cz] });
+    // 幅木
+    const base = this.mat('#1c1c1c', 0.6);
+    this.box(W, 0.1, 0.02, 0, 0.05, Z0 + 0.01, base, { phys: false }); this.box(W, 0.1, 0.02, 0, 0.05, Z1 - 0.01, base, { phys: false });
+    this.box(0.02, 0.1, D, -X + 0.01, 0.05, cz, base, { phys: false }); this.box(0.02, 0.1, D, X - 0.01, 0.05, cz, base, { phys: false });
+  }
+  // 壁に貼る板（見た目だけ）。side: 'back'|'front'|'left'|'right'
+  _wallPlane(side, X, Z0, Z1, w, h, a, y, material, off = 0.012) {
+    if (side === 'back') return this.plane(w, h, a, y, Z0 + off, material, 0);
+    if (side === 'front') return this.plane(w, h, a, y, Z1 - off, material, Math.PI);
+    if (side === 'left') return this.plane(w, h, -X + off, y, a, material, Math.PI / 2);
+    return this.plane(w, h, X - off, y, a, material, -Math.PI / 2);
+  }
+  _keySpot(C, color, intensity, from, angle = 0.5) {
+    const spot = new THREE.SpotLight(color, intensity, 12, angle, 0.55, 2);
+    spot.position.copy(from); spot.target.position.set(C.x, 0.9, C.z);
+    spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024); spot.shadow.bias = -0.0006; spot.shadow.normalBias = 0.02;
+    this.stage.add(spot, spot.target);
+    return spot;
+  }
+
+  // ---- 夜の美術館 ----
+  _museum(C, stone) {
+    const X = 4.2, Z0 = -6.4, Z1 = 1.6, Hh = 4.2;
+    this._shell(X, Z0, Z1, Hh, this.mat('#ffffff', 0.25, 0, { map: TX.marble(X * 2 / 1.2, (Z1 - Z0) / 1.2) }), this.mat('#6d6860', 0.9, 0, { map: TX.wallpaper(4, 2) }), this.mat('#161617', 0.95));
+    // 額縁の絵（ほのかに照らされているように少し光らせる）
+    const frame = this.mat('#3b2f1f', 0.4, 0.5);
+    const hang = (side, a, i, w = 1.0, h = 1.25) => {
+      const tex = TX.painting(i);
+      this._wallPlane(side, X, Z0, Z1, w + 0.12, h + 0.12, a, 1.75, frame, 0.01);
+      this._wallPlane(side, X, Z0, Z1, w, h, a, 1.75, this.mat('#ffffff', 0.8, 0, { map: tex, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.22 }), 0.02);
+    };
+    hang('back', -2.3, 0); hang('back', 2.3, 1); hang('left', -3.4, 2, 1.2, 0.9); hang('right', -3.4, 3, 1.2, 0.9); hang('front', -2.4, 1, 0.9, 1.1); hang('front', 2.4, 2, 0.9, 1.1);
+    // 絵の上の小さなライト（器具だけ）
+    for (const x of [-2.3, 2.3]) this.box(0.5, 0.04, 0.12, x, 2.55, Z0 + 0.1, this.mat('#1a1a1a', 0.5, 0.5), { phys: false });
+    // 展示台（壺・甕を置く低い台）
+    const plinth = this.box(1.4, 0.14, 1.4, C.x, 0.07, C.z, this.mat(stone ? '#3a3a3c' : '#ece9e2', 0.5), { surface: 'wood' }); plinth.userData.surface = 'wood';
+    // 説明パネル（斜めの小さな台）
+    const cap = stone ? TX.caption('石の大甕', '制作年不詳・とても重い') : TX.caption('染付大壺', '伝 江戸時代・作者不詳');
+    const post = this.box(0.05, 0.9, 0.05, C.x + 1.05, 0.45, C.z + 1.05, this.mat('#1d1d1d', 0.5, 0.4), { phys: false });
+    const card = this.plane(0.36, 0.18, C.x + 1.05, 0.95, C.z + 1.08, this.mat('#ffffff', 0.7, 0, { map: cap, emissive: '#ffffff', emissiveMap: cap, emissiveIntensity: 0.25 }), 0, -0.6);
+    // 立入禁止のロープ
+    const chrome = this.mat('#c8cacc', 0.2, 1), velvet = this.mat('#7a1020', 0.8);
+    const posts = [];
+    for (let k = 0; k < 6; k++) {
+      const a = k / 6 * Math.PI * 2, R = 1.55; // 手前（+z）が入口になるように
+      const x = C.x + Math.cos(a) * R, z = C.z + Math.sin(a) * R;
+      const pm = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.9, 12), chrome); pm.position.set(x, 0.45, z); pm.castShadow = true; this.stage.add(pm);
+      const bm = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.03, 20), chrome); bm.position.set(x, 0.015, z); this.stage.add(bm);
+      const tm = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), chrome); tm.position.set(x, 0.92, z); this.stage.add(tm);
+      posts.push(new THREE.Vector3(x, 0.86, z));
+    }
+    for (let k = 0; k < posts.length; k++) {
+      if (k === 1) continue; // 1か所は開いている（入口）
+      const a = posts[k], b = posts[(k + 1) % posts.length], m = a.clone().lerp(b, 0.5); m.y -= 0.18;
+      const curve = new THREE.QuadraticBezierCurve3(a, m, b);
+      const rope = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.016, 6), velvet); rope.castShadow = true; this.stage.add(rope);
+    }
+    // 両脇の小さな展示（ガラスケースの中の器。割れない飾り）
+    const glassMat = new THREE.MeshStandardMaterial({ color: '#cfe3ea', roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.18, depthWrite: false });
+    for (const sx of [-1, 1]) {
+      const x = sx * 3.1, z = -4.6;
+      this.box(0.6, 1.0, 0.6, x, 0.5, z, this.mat('#e7e4dd', 0.5), { surface: 'wood', cast: true });
+      const vm = new THREE.Mesh(this.lathe([[0, 0], [0.08, 0], [0.12, 0.08], [0.14, 0.2], [0.09, 0.32], [0.06, 0.36], [0.08, 0.4], [0, 0.4]], 24), this.mat(sx < 0 ? '#2f5d4a' : '#8a3b2a', 0.3));
+      vm.position.set(x, 1.0, z); vm.castShadow = true; this.stage.add(vm);
+      this.box(0.58, 0.6, 0.58, x, 1.3, z, glassMat, { phys: false });
+    }
+    // 非常口の誘導灯
+    const ex = TX.exitSign();
+    this._wallPlane('front', X, Z0, Z1, 0.6, 0.22, -3.2, 2.7, this.mat('#ffffff', 0.5, 0, { map: ex, emissive: '#ffffff', emissiveMap: ex, emissiveIntensity: 1.0 }), 0.02);
+    const exl = new THREE.PointLight('#5cff9c', 0.8, 3, 2); exl.position.set(-3.2, 2.5, Z1 - 0.3); this.stage.add(exl);
+    // 明かり：展示物だけを強く、あとは暗く
+    this._keySpot(C, '#fff0d8', 80, new THREE.Vector3(0.6, Hh - 0.1, C.z + 1.6), 0.42);
+    const fill = new THREE.PointLight('#8fa2bb', 3, 9, 2); fill.position.set(0, 3.2, 0.6); this.stage.add(fill);
+    const back = new THREE.PointLight('#aebfd6', 3, 6, 2); back.position.set(0.8, 2.6, -4.8); this.stage.add(back);
+  }
+
+  // ---- 深夜のオフィス ----
+  _office(C) {
+    const X = 4.0, Z0 = -5.6, Z1 = 1.4, Hh = 2.7;
+    this._shell(X, Z0, Z1, Hh, this.mat('#ffffff', 0.95, 0, { map: TX.carpet(X * 2, Z1 - Z0) }), this.mat('#b3b1aa', 0.9, 0, { map: TX.wallpaper(4, 2) }), this.mat('#ffffff', 0.9, 0, { map: TX.ceilPanel(X * 2 / 0.6, (Z1 - Z0) / 0.6) }));
+    // 奥の窓（夜のビル）
+    const bl = TX.nightBlinds();
+    this._wallPlane('back', X, Z0, Z1, 6.4, 1.5, 0, 1.45, this.mat('#ffffff', 0.6, 0, { map: bl, emissive: '#ffffff', emissiveMap: bl, emissiveIntensity: 0.55 }), 0.01);
+    this.box(6.5, 0.06, 0.08, 0, 0.67, Z0 + 0.04, this.mat('#8d8f92', 0.4, 0.6), { phys: false });
+    // ホワイトボードと、キャビネット
+    const wb = TX.whiteboard();
+    this._wallPlane('left', X, Z0, Z1, 1.8, 0.9, -2.6, 1.5, this.mat('#ffffff', 0.35, 0, { map: wb }), 0.02);
+    for (let k = 0; k < 3; k++) {
+      const z = -3.6 + k * 0.5;
+      this.box(0.5, 1.1, 0.46, X - 0.26, 0.55, z, this.mat('#9ea3a8', 0.45, 0.5), { surface: 'steel', cast: true });
+      for (let d = 0; d < 3; d++) this.box(0.01, 0.02, 0.2, X - 0.51, 0.25 + d * 0.33, z, this.mat('#555', 0.4, 0.6), { phys: false });
+    }
+    // 他の席（消えたモニターと椅子）
+    const desk = this.mat('#cfc9bd', 0.5), leg = this.mat('#55585c', 0.6, 0.6), dark = this.mat('#141518', 0.4, 0.2);
+    for (const [x, z] of [[-2.5, -1.2], [-2.5, -3.4], [2.3, -0.9], [-2.5, 0.6]]) {
+      this.box(1.2, 0.04, 0.65, x, 0.7, z, desk, { surface: 'wood', cast: true });
+      for (const sx of [-1, 1]) this.box(0.04, 0.68, 0.6, x + sx * 0.56, 0.34, z, leg, { phys: false });
+      this.box(0.55, 0.33, 0.03, x, 1.1, z - 0.18, dark, { phys: false });
+      this.box(0.05, 0.22, 0.03, x, 0.83, z - 0.2, leg, { phys: false });
+      // 椅子
+      const cx = x + 0.1, cz = z + 0.55;
+      this.box(0.46, 0.08, 0.46, cx, 0.46, cz, dark, { surface: 'wood', cast: true });
+      this.box(0.46, 0.5, 0.06, cx, 0.78, cz + 0.22, dark, { phys: false });
+      this.box(0.05, 0.4, 0.05, cx, 0.22, cz, leg, { phys: false });
+    }
+    // 観葉植物
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.4, 16), this.mat('#e5e2dc', 0.6)); pot.position.set(3.4, 0.2, 0.7); pot.castShadow = true; this.stage.add(pot);
+    for (let k = 0; k < 7; k++) { const l = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), this.mat('#2f5a33', 0.8)); l.scale.set(1, 1.4, 1); l.position.set(3.4 + Math.cos(k) * 0.14, 0.7 + k * 0.1, 0.7 + Math.sin(k * 2) * 0.14); this.stage.add(l); }
+    // 天井の照明：この席の上だけ点いている
+    const tube = (x, z, on) => this.box(1.2, 0.03, 0.22, x, Hh - 0.02, z, this.mat('#ffffff', 0.4, 0, { emissive: '#e8f1ff', emissiveIntensity: on ? 1.4 : 0.06 }), { phys: false });
+    for (const x of [-2.4, 0, 2.4]) for (const z of [-4.2, -2.3, -0.4]) tube(x, z, x === 0 && z === -2.3);
+    this._keySpot(C, '#eef4ff', 34, new THREE.Vector3(0.1, Hh - 0.08, C.z + 0.3), 0.8);
+    const fill = new THREE.PointLight('#6f85a8', 2.5, 8, 2); fill.position.set(0, 2.2, -4.6); this.stage.add(fill);
+    const fr = new THREE.PointLight('#8a93a3', 1.2, 6, 2); fr.position.set(0, 2.2, 0.8); this.stage.add(fr);
+  }
+
+  // ---- 閉店後のレストランの厨房 ----
+  _restaurant(C) {
+    const X = 3.8, Z0 = -5.2, Z1 = 1.4, Hh = 2.8;
+    this._shell(X, Z0, Z1, Hh, this.mat('#ffffff', 0.4, 0, { map: TX.checker(X * 2 / 0.6, (Z1 - Z0) / 0.6) }), this.mat('#ffffff', 0.3, 0, { map: TX.subway(X * 2 / 0.6, Hh / 0.3) }), this.mat('#1d1e20', 0.9));
+    const steel = this.mat('#b9bcbf', 0.28, 0.9), steelDark = this.mat('#6f7275', 0.35, 0.8);
+    // 奥：ステンレスの調理台とコンロ、フード
+    this.box(6.4, 0.9, 0.7, 0, 0.45, Z0 + 0.35, steel, { surface: 'steel', cast: true });
+    for (let k = 0; k < 4; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.02, 20), this.mat('#1a1a1a', 0.6)); b.position.set(-1.2 + k * 0.5, 0.91, Z0 + 0.35); this.stage.add(b); }
+    this.box(2.6, 0.5, 0.8, -0.45, 2.3, Z0 + 0.4, steelDark, { phys: false });
+    // 鍋とフライパン（飾り）
+    const pot = (x, r, h, c) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.95, h, 20), this.mat(c, 0.3, 0.9)); m.position.set(x, 0.92 + h / 2, Z0 + 0.35); m.castShadow = true; this.stage.add(m); };
+    pot(-1.2, 0.16, 0.2, '#a7aaad'); pot(-0.2, 0.12, 0.26, '#8d9093'); pot(1.6, 0.2, 0.14, '#6d7073');
+    // 棚とお玉
+    this.box(3.0, 0.03, 0.3, 1.7, 1.75, Z0 + 0.16, steel, { phys: false });
+    for (let k = 0; k < 5; k++) { const l = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.4, 6), steel); l.position.set(0.5 + k * 0.2, 1.52, Z0 + 0.08); this.stage.add(l); const c = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), steel); c.position.set(0.5 + k * 0.2, 1.3, Z0 + 0.08); this.stage.add(c); }
+    // 伝票レールと黒板メニュー
+    this.box(1.4, 0.02, 0.04, 2.0, 2.05, Z0 + 0.03, steel, { phys: false });
+    for (let k = 0; k < 4; k++) this.plane(0.1, 0.16, 1.5 + k * 0.28, 1.95, Z0 + 0.06, this.mat('#f4efe0', 0.8), 0);
+    const mb = TX.menuBoard();
+    this._wallPlane('left', X, Z0, Z1, 0.8, 1.0, -2.2, 1.55, this.mat('#ffffff', 0.8, 0, { map: mb, emissive: '#ffffff', emissiveMap: mb, emissiveIntensity: 0.12 }), 0.02);
+    // 横：客席側への受け渡し口（向こうは暗い店内）
+    this._wallPlane('right', X, Z0, Z1, 1.6, 0.8, -2.6, 1.45, this.mat('#0c0a08', 0.9), 0.015);
+    this.box(0.4, 0.04, 1.7, X - 0.2, 1.05, -2.6, steel, { surface: 'steel' });
+    // 手前の壁際の食器棚（空のラック）
+    this.box(1.8, 1.6, 0.4, -2.2, 0.8, Z1 - 0.22, steelDark, { surface: 'steel', cast: true });
+    // ペンダントライト
+    const lamp = (x, z, on) => {
+      const shade = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.2, 20, 1, true), this.mat('#2a2a2a', 0.5, 0.5, { side: THREE.DoubleSide })); shade.position.set(x, 2.2, z); this.stage.add(shade);
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, Hh - 2.3, 4), this.mat('#111', 0.8)); cord.position.set(x, (Hh + 2.3) / 2, z); this.stage.add(cord);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), this.mat('#fff4dc', 0.3, 0, { emissive: '#ffdca0', emissiveIntensity: on ? 2 : 0.1 })); bulb.position.set(x, 2.12, z); this.stage.add(bulb);
+    };
+    lamp(0, C.z, true); lamp(-2.2, -1.0, false); lamp(2.0, -0.6, false);
+    this._keySpot(C, '#ffe2b8', 40, new THREE.Vector3(0, 2.1, C.z), 0.9);
+    const fill = new THREE.PointLight('#8fa2bb', 2.2, 8, 2); fill.position.set(0, 2.3, 0.6); this.stage.add(fill);
+    const warm = new THREE.PointLight('#ffb35c', 1.2, 4, 2); warm.position.set(X - 0.6, 1.6, -2.6); this.stage.add(warm);
+  }
+
   // 支えが無くなった所に積もっていた破片を消す
   clearDebrisIn(min, max) {
     this.debrisSolid.removeIn(min, max); this.debrisGlass.removeIn(min, max);
@@ -330,12 +503,13 @@ export class World {
   }
   // 作業台（皿用）と事務机（モニター用）
   _furniture(kind, x, z) {
-    const table = kind === 'table';
+    const table = kind === 'table' || kind === 'steel', st = kind === 'steel';
     const H = table ? 0.78 : 0.72, w = table ? 1.3 : 1.2, d = table ? 0.75 : 0.65;
-    const top = this.mat(table ? '#8c6a45' : '#cfc9bd', table ? 0.75 : 0.5);
-    const leg = this.mat(table ? '#5d4630' : '#55585c', 0.6, table ? 0 : 0.6);
-    const tm = this.box(w, 0.04, d, x, H - 0.02, z, top, { surface: 'wood', cast: true });
-    if (tm) tm.userData.surface = 'wood';
+    const top = st ? this.mat('#c3c6c9', 0.25, 0.9) : this.mat(table ? '#8c6a45' : '#cfc9bd', table ? 0.75 : 0.5);
+    const leg = st ? this.mat('#9a9da0', 0.3, 0.9) : this.mat(table ? '#5d4630' : '#55585c', 0.6, table ? 0 : 0.6);
+    const tm = this.box(w, 0.04, d, x, H - 0.02, z, top, { surface: st ? 'steel' : 'wood', cast: true });
+    if (tm) tm.userData.surface = st ? 'steel' : 'wood';
+    if (st) this.box(w - 0.1, 0.03, d - 0.1, x, 0.2, z, top, { phys: false });
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) this.box(0.05, H - 0.04, 0.05, x + sx * (w / 2 - 0.06), (H - 0.04) / 2, z + sz * (d / 2 - 0.06), leg, { surface: 'wood', cast: true });
     if (!table) {
       // キーボードとマウス（飾り）
@@ -797,7 +971,7 @@ export class World {
     if (this.heldMesh) { this.hand.remove(this.heldMesh); this.heldMesh = null; }
     this._refill(0);
   }
-  _refill(delay) { this.refillAt = this.clock + delay; }
+  _refill(delay) { this.refillAt = this.clock + delay + 1e-4; } // 0だと「補充なし」と区別できないので少し足す
  _spawnHeld() {
     if (this.heldKind === 'hammer') { const h = this.makeHammer(); this.heldMesh = h; this.hand.add(h); this.handT = 0; return; }
     const m = this.heldKind === 'glass' ? this.makeGlass() : this.heldKind === 'egg' ? this.makeEgg() : this.makeCan();
@@ -839,7 +1013,7 @@ export class World {
     const moving = new Set(this.dyn.map(r => r.mesh));
     for (const sb of this.shards) if (sb.ud && sb.ud.mesh) moving.add(sb.ud.mesh);
     const isMoving = (o) => { for (let q = o; q; q = q.parent) if (moving.has(q)) return true; return false; };
-    const rc = new THREE.Raycaster(); rc.near = 0.1; rc.far = 2.5;
+    const rc = new THREE.Raycaster(); rc.near = 0.1; rc.far = 3.0;
     const cast = (dir) => {
       rc.set(cam.position, dir);
       for (const h of rc.intersectObjects(this.stage.children, true)) {

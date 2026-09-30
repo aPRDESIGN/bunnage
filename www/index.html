@@ -8,7 +8,7 @@
 <title>ぶん投げ部屋 Demo v0.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=DotGothic16&family=Press+Start+2P&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
 <style>
 /* 全画面の3D＋最小限のHUD。暗い単一テーマ */
 :root{
@@ -107,6 +107,59 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 #rotate{position:fixed;inset:0;background:var(--bg);display:none;place-items:center;text-align:center;padding:24px;font-weight:700;font-size:18px}
 @media (orientation:landscape) and (max-height:520px){#rotate{display:grid}}
 @media (prefers-reduced-motion:reduce){#pulse::after{animation:none}}
+
+/* ===== 深夜のゲームセンター風（タイトルとメニュー） ===== */
+:root{--neon:#ff2b3d;--neon2:#35e0ff;--f-dot:"DotGothic16","Hiragino Sans",monospace;--f-px:"Press Start 2P","DotGothic16",monospace}
+.arcade{background:#07070a;overflow:hidden}
+.arcade::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:5;background:repeating-linear-gradient(to bottom,rgba(0,0,0,.32) 0 1px,rgba(0,0,0,0) 1px 3px);mix-blend-mode:multiply}
+.arcade::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:6;background:radial-gradient(ellipse 90% 80% at 50% 50%,rgba(0,0,0,0) 60%,rgba(0,0,0,.75) 100%);animation:flick 5s steps(1) infinite}
+@keyframes flick{0%,100%{opacity:1}47%{opacity:.86}48%{opacity:1}72%{opacity:.93}73%{opacity:1}}
+.screen.arcade{background:#07070a}
+.screen.arcade .inner{position:relative;z-index:2}
+
+#titleScreen{position:fixed;inset:0;display:grid;grid-template-rows:auto 1fr auto auto;padding:calc(var(--safe-t) + 18px) 18px calc(var(--safe-b) + 18px);z-index:20;cursor:pointer;background:radial-gradient(ellipse 80% 55% at 50% 42%,#2a0a10 0%,#0b0507 55%,#050506 100%)}
+.t-top,.t-foot{display:flex;justify-content:space-between;font-family:var(--f-px);font-size:9px;letter-spacing:.08em;color:#8e8a92;position:relative;z-index:2}
+.t-top span:first-child{color:var(--neon2)}
+.t-stage{position:relative;display:grid;place-items:center;z-index:2}
+.t-logo-wrap{position:relative;text-align:center;padding:24px 10px}
+.t-kicker{margin:0 0 14px;font-family:var(--f-px);font-size:10px;color:#ffcf5a;letter-spacing:.2em}
+.t-logo{position:relative;margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(58px,19vw,96px);line-height:1;color:#fff;text-shadow:0 0 6px rgba(255,43,61,.9),0 0 22px rgba(255,43,61,.6),4px 4px 0 #7a0012}
+.t-logo::before,.t-logo::after{content:attr(data-text);white-space:pre;position:absolute;inset:0;pointer-events:none;text-shadow:none;opacity:.8}
+.t-logo::before{color:var(--neon2);transform:translate(-3px,0);mix-blend-mode:screen;animation:glitchA 3.4s steps(1) infinite}
+.t-logo::after{color:var(--neon);transform:translate(3px,0);mix-blend-mode:screen;animation:glitchB 3.4s steps(1) infinite}
+@keyframes glitchA{0%,86%,100%{clip-path:inset(0 0 100% 0)}87%{clip-path:inset(12% 0 60% 0);transform:translate(-8px,0)}89%{clip-path:inset(55% 0 20% 0);transform:translate(6px,0)}91%{clip-path:inset(30% 0 45% 0);transform:translate(-4px,0)}93%{clip-path:inset(0 0 100% 0)}}
+@keyframes glitchB{0%,86%,100%{clip-path:inset(0 0 100% 0)}88%{clip-path:inset(40% 0 35% 0);transform:translate(8px,0)}90%{clip-path:inset(70% 0 5% 0);transform:translate(-6px,0)}92%{clip-path:inset(5% 0 80% 0);transform:translate(5px,0)}94%{clip-path:inset(0 0 100% 0)}}
+.t-en{margin:16px 0 0;font-family:var(--f-px);font-size:14px;letter-spacing:.3em;color:var(--neon);text-shadow:0 0 8px rgba(255,43,61,.8)}
+.t-press{position:relative;z-index:2;margin:0 0 26px;text-align:center;font-family:var(--f-px);font-size:15px;color:#fff;letter-spacing:.12em;animation:blink 1.1s steps(1) infinite}
+.t-press small{display:block;margin-top:12px;font-family:var(--f-dot);font-size:14px;letter-spacing:.1em;color:#d8d3da}
+@keyframes blink{0%,60%{opacity:1}61%,100%{opacity:.15}}
+#tCrack{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+#tCrack path{fill:none;stroke:#fff;stroke-width:.5;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 2px #fff)}
+#tFlash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:9}
+.t-shard{position:absolute;pointer-events:none;z-index:3}
+#titleScreen.broken .t-press,#titleScreen.broken #tLogo{visibility:hidden}
+
+.a-head{display:grid;gap:8px;margin-bottom:4px}
+.a-kick{margin:0;font-family:var(--f-px);font-size:11px;letter-spacing:.14em;color:var(--neon);text-shadow:0 0 8px rgba(255,43,61,.7)}
+.a-kick::after{content:"_";animation:blink 1s steps(1) infinite}
+.a-logo{margin:0;font-family:var(--f-display);font-size:34px;line-height:1.1;color:#fff;text-shadow:0 0 8px rgba(255,43,61,.8),3px 3px 0 #7a0012}
+.a-title{margin:0;font-family:var(--f-dot);font-size:26px;color:#fff}
+.screen.arcade .stage-card{position:relative;background:rgba(10,8,12,.9);border:2px solid rgba(255,43,61,.55);border-left-width:2px;border-radius:2px;padding:14px 16px 14px 34px;box-shadow:0 0 0 1px rgba(0,0,0,.6) inset,0 0 14px rgba(255,43,61,.18);transition:background .08s,box-shadow .08s}
+.screen.arcade .stage-card i{font-style:normal;font-family:var(--f-px);font-size:9px;letter-spacing:.12em;color:var(--neon2)}
+.screen.arcade .stage-card b{font-family:var(--f-dot);font-size:23px;color:#fff}
+.screen.arcade .stage-card span{font-family:var(--f-dot);font-size:13px;color:#b9b3bd}
+.screen.arcade .stage-card::before{content:"▶";position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--neon);opacity:0}
+.screen.arcade .stage-card:hover::before,.screen.arcade .stage-card:focus-visible::before,.screen.arcade .stage-card.hit::before{opacity:1;animation:blink .6s steps(1) infinite}
+.screen.arcade .stage-card:hover,.screen.arcade .stage-card.hit{border-color:var(--neon);box-shadow:0 0 22px rgba(255,43,61,.45)}
+.screen.arcade .stage-card.hit{background:#3a0810}
+.screen.arcade .pick button{background:rgba(10,8,12,.9);border:2px solid rgba(53,224,255,.45);border-radius:2px;font-family:var(--f-dot);font-size:17px;font-weight:400}
+.screen.arcade .pick button.hit{background:#08303a;border-color:var(--neon2)}
+.screen.arcade .pick small{font-family:var(--f-dot)}
+.screen.arcade .back{font-family:var(--f-px);font-size:11px;color:#9a95a0;text-decoration:none;letter-spacing:.1em}
+.screen.arcade .safety{font-family:var(--f-dot);font-size:13px;color:#ffcf5a;border-left-color:#ffcf5a}
+.screen.power-on .inner{animation:powerOn .45s ease-out}
+@keyframes powerOn{0%{transform:scaleY(.02) scaleX(.6);filter:brightness(4)}40%{transform:scaleY(.08) scaleX(1);filter:brightness(2.5)}100%{transform:none;filter:none}}
+@media (prefers-reduced-motion:reduce){.t-logo::before,.t-logo::after,.arcade::after,.t-press{animation:none}}
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js", "cannon-es": "./vendor/cannon-es.js" } }
@@ -143,38 +196,52 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
   </div>
 </div>
 
-<section id="stageScreen" class="screen">
+<section id="titleScreen" class="arcade" aria-label="タイトル">
+  <div class="t-top"><span>1P READY</span><span>MIDNIGHT ARCADE</span></div>
+  <div class="t-stage">
+    <div id="tLogo" class="t-logo-wrap">
+      <p class="t-kicker">DEMO v0.1</p>
+      <h1 class="t-logo" data-text="ぶん投げ&#10;部屋">ぶん投げ<br>部屋</h1>
+      <p class="t-en">SMASH ROOM</p>
+    </div>
+    <svg id="tCrack" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+  </div>
+  <p class="t-press">PRESS START<small>タップしてスタート</small></p>
+  <div class="t-foot"><span>&copy; 2026 aPR DESIGN</span><span>CREDIT 01</span></div>
+  <div id="tFlash"></div>
+</section>
+
+<section id="stageScreen" class="screen arcade" hidden>
   <div class="inner">
-    <p class="eyebrow">DEMO v0.1</p>
-    <h1>ぶん投げ<br>部屋</h1>
-    <p class="lead">投げて、壊して、片付けない。</p>
-    <button id="stageKitchen" class="stage-card" type="button"><b>キッチン</b><span>夜、ちょっと古いマンションの台所</span></button>
-    <button id="stageWarehouse" class="stage-card" type="button"><b>倉庫と巨大な壺</b><span>人の背丈より大きい壺を、ひたすら割る</span></button>
-    <button id="stageHammer" class="stage-card" type="button"><b>ハンマーで叩き割る</b><span>皿の山、壺、石の甕、パソコンのモニター。すぐそばに立って振り下ろす</span></button>
-    <!-- 隠しステージ：URLの最後に ?car を付けたときだけ出る --><button id="stageCar" class="stage-card" type="button" hidden><b>地下駐車場の車</b><span>赤いスポーツカーのガラスを割って、へこませる</span></button>
-        <p class="safety">スマホは手から離さずに、しっかり握ったまま振ってください。まわりに人や物がないか確かめてから。</p>
+    <div class="a-head"><p class="a-kick">SELECT STAGE</p><p class="a-logo">ぶん投げ部屋</p></div>
+    <button id="stageKitchen" class="stage-card" type="button"><i>STAGE 01</i><b>キッチン</b><span>夜、ちょっと古いマンションの台所。投げて割る</span></button>
+    <button id="stageWarehouse" class="stage-card" type="button"><i>STAGE 02</i><b>倉庫と巨大な壺</b><span>人の背丈より大きい壺を、ひたすら割る</span></button>
+    <button id="stageHammer" class="stage-card" type="button"><i>STAGE 03</i><b>ハンマーで叩き割る</b><span>厨房の皿、美術館の壺、オフィスのモニター</span></button>
+    <!-- 隠しステージ：URLの最後に ?car を付けたときだけ出る --><button id="stageCar" class="stage-card" type="button" hidden><i>SECRET</i><b>地下駐車場の車</b><span>赤いスポーツカーのガラスを割って、へこませる</span></button>
+    <p class="safety">スマホは手から離さずに、しっかり握ったまま振ってください。まわりに人や物がないか確かめてから。</p>
   </div>
 </section>
 
-<section id="hammerScreen" class="screen" hidden>
+<section id="hammerScreen" class="screen arcade" hidden>
   <div class="inner">
-    <h2>ハンマーで叩くものを選ぶ</h2>
-    <button class="stage-card" data-hk="plates" type="button"><b>皿の山</b><span>積んだ白い皿。叩くとガシャンと崩れる</span></button>
-    <button class="stage-card" data-hk="vase" type="button"><b>壺</b><span>大きな壺。3回くらいで割れる</span></button>
-    <button class="stage-card" data-hk="stone" type="button"><b>石の甕</b><span>かたい。強く何回も叩いてやっと割れる</span></button>
-    <button class="stage-card" data-hk="monitor" type="button"><b>パソコンのモニター</b><span>画面が割れて、最後は机から落ちる</span></button>
-    <button id="hammerBack" class="back" type="button">戻る</button>
+    <div class="a-head"><p class="a-kick">STAGE 03 / HAMMER</p><p class="a-title">叩くものを選べ</p></div>
+    <button class="stage-card" data-hk="plates" type="button"><i>閉店後の厨房</i><b>皿の山</b><span>積んだ白い皿。叩くとガシャンと崩れる</span></button>
+    <button class="stage-card" data-hk="vase" type="button"><i>夜の美術館</i><b>壺</b><span>大きな壺。3回くらいで割れる</span></button>
+    <button class="stage-card" data-hk="stone" type="button"><i>夜の美術館</i><b>石の甕</b><span>かたい。強く何回も叩いてやっと割れる</span></button>
+    <button class="stage-card" data-hk="monitor" type="button"><i>深夜のオフィス</i><b>パソコンのモニター</b><span>画面が割れて、最後は机から落ちる</span></button>
+    <button id="hammerBack" class="back" type="button">&lt; BACK</button>
   </div>
 </section>
 
-<section id="itemScreen" class="screen" hidden>
+<section id="itemScreen" class="screen arcade" hidden>
   <div class="inner">
-    <h2>投げるものを選ぶ</h2>
+    <div class="a-head"><p class="a-kick">SELECT WEAPON</p><p class="a-title">投げるものを選べ</p></div>
     <div class="pick">
       <button data-kind="glass" type="button"><svg><use href="#i-glass"/></svg>グラス<small>パリーン</small></button>
       <button data-kind="egg" type="button"><svg><use href="#i-egg"/></svg>卵<small>ベチャッ</small></button>
       <button data-kind="can" type="button"><svg><use href="#i-can"/></svg>缶<small>カンッ</small></button>
     </div>
+    <button id="itemBack" class="back" type="button">&lt; BACK</button>
   </div>
 </section>
 
@@ -202,6 +269,6 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 <div id="fade"></div>
 <div id="rotate">縦向きで遊んでください</div>
 
-<script type="module" src="./js/main.js?v=202609300517"></script>
+<script type="module" src="./js/main.js?v=202609300610"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 // iPhoneアプリ（Capacitor）では @capacitor/haptics（Core Haptics）を使う。
 // ブラウザでは navigator.vibrate（Androidのみ）。iPhoneのSafariでは何も起きない。
 
-export const hapticSettings = { hit: true, break: true, iosSwitch: true };
+export const hapticSettings = { hit: true, break: true, iosSwitch: false }; // iPhoneの裏技は実機で効かなかったので切ってある
 
 function plugin() {
   const cap = window.Capacitor;
@@ -43,7 +43,7 @@ function vib(pattern) {
 }
 
 export const haptics = {
-  get kind() { return plugin() ? 'native' : canVibrate ? 'vibrate' : isIOS ? 'ios-switch' : 'none'; },
+  get kind() { return plugin() ? 'native' : canVibrate ? 'vibrate' : 'none'; },
 
   // HOLD成立：物を掴んだ感覚。軽く短く
   hold() {

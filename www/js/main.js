@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300517';
-import { SwingDetector } from './motion.js?v=202609300517';
-import { sfx } from './audio.js?v=202609300517';
-import { haptics, hapticSettings } from './haptics.js?v=202609300517';
+import { World } from './world.js?v=202609300610';
+import { SwingDetector } from './motion.js?v=202609300610';
+import { sfx } from './audio.js?v=202609300610';
+import { haptics, hapticSettings } from './haptics.js?v=202609300610';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -20,7 +20,7 @@ function resize() { world.resize(window.innerWidth, window.innerHeight); }
 window.addEventListener('resize', resize); resize();
 
 // ---------------- 状態 ----------------
-let mode = 'stage';          // stage | item | play
+let mode = 'title';          // title | stage | item | hammer | play
 let item = 'glass';
 let holding = false, holdEnding = false;
 let lockUntil = 0;           // 投擲完了までカメラとUIをロック
@@ -30,12 +30,88 @@ let debugOn = false;
 
 // ---------------- 画面遷移 ----------------
 function show(id) {
+  const prev = mode;
+  $('#titleScreen').hidden = id !== 'title';
   $('#stageScreen').hidden = id !== 'stage';
   $('#itemScreen').hidden = id !== 'item';
   $('#hammerScreen').hidden = id !== 'hammer';
   $('#hud').hidden = id !== 'play';
   mode = id;
+  // メニュー画面はブラウン管が点くように出す
+  const el = { stage: '#stageScreen', item: '#itemScreen', hammer: '#hammerScreen' }[id];
+  if (el && prev !== id) { const e = $(el); e.classList.remove('power-on'); void e.offsetWidth; e.classList.add('power-on'); }
 }
+
+// ---------------- タイトル：タップするとロゴにひびが入って割れる ----------------
+let titleBusy = false;
+function crackPaths(cx, cy) {
+  let d = '';
+  for (let k = 0; k < 9; k++) {
+    const a = k / 9 * Math.PI * 2 + Math.random() * 0.5;
+    let x = cx, y = cy; d += `M${x.toFixed(1)} ${y.toFixed(1)}`;
+    const len = 12 + Math.random() * 22;
+    for (let s = 0; s < 5; s++) { const r = len / 5; x += Math.cos(a + (Math.random() - 0.5) * 0.7) * r; y += Math.sin(a + (Math.random() - 0.5) * 0.7) * r * 1.2; d += ` L${x.toFixed(1)} ${y.toFixed(1)}`; }
+  }
+  // 中心のまわりの輪っか状のひび
+  for (const rr of [5, 11]) { d += ` M${(cx + rr).toFixed(1)} ${cy.toFixed(1)}`; for (let k = 1; k <= 12; k++) { const a = k / 12 * Math.PI * 2; d += ` L${(cx + Math.cos(a) * rr * (0.8 + Math.random() * 0.4)).toFixed(1)} ${(cy + Math.sin(a) * rr * 1.2 * (0.8 + Math.random() * 0.4)).toFixed(1)}`; } }
+  return d;
+}
+function shatterTitle(ev) {
+  if (titleBusy) return; titleBusy = true;
+  sfx.unlock(); sfx.coin();
+  const scr = $('#titleScreen'), logo = $('#tLogo'), svg = $('#tCrack');
+  const box = logo.getBoundingClientRect(), sbox = svg.getBoundingClientRect(), scb = scr.getBoundingClientRect();
+  // ひびの中心：タップした所（ロゴの外なら中心あたり）
+  let px = ev && ev.clientX != null ? ev.clientX : box.left + box.width / 2, py = ev && ev.clientY != null ? ev.clientY : box.top + box.height / 2;
+  if (px < box.left || px > box.right || py < box.top || py > box.bottom) { px = box.left + box.width / 2; py = box.top + box.height * 0.45; }
+  const cx = (px - sbox.left) / sbox.width * 100, cy = (py - sbox.top) / sbox.height * 100;
+  setTimeout(() => {
+    svg.innerHTML = `<path d="${crackPaths(cx, cy)}"/>`;
+    const path = svg.querySelector('path'), L = 2000;
+    path.style.strokeDasharray = L; path.style.strokeDashoffset = L;
+    path.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }], { duration: 260, easing: 'ease-out', fill: 'forwards' });
+    sfx.glass(0.5); sfx.knock(6, 0.5);
+  }, 260);
+  setTimeout(() => {
+    // ロゴを放射状のかけらに分けて、飛び散らせる
+    const lx = (px - box.left) / box.width * 100, ly = (py - box.top) / box.height * 100;
+    const N = 10, rim = [];
+    const corner = [[102, -2], [102, 102], [-2, 102], [-2, -2]];
+    for (let k = 0; k < N; k++) {
+      const t = k / N * 4, side = Math.floor(t), f = Math.min(1, Math.max(0, t - side + (Math.random() - 0.5) * 0.12));
+      rim.push({ side, p: side === 0 ? [f * 104 - 2, -2] : side === 1 ? [102, f * 104 - 2] : side === 2 ? [102 - f * 104, 102] : [-2, 102 - f * 104] });
+    }
+    for (let k = 0; k < N; k++) {
+      const a = rim[k], b = rim[(k + 1) % N];
+      const pts = [[lx, ly], a.p];
+      // 辺をまたぐかけらは角も含める
+      let sd = a.side; while (sd !== b.side) { pts.push(corner[sd]); sd = (sd + 1) % 4; }
+      pts.push(b.p);
+      const c = logo.cloneNode(true); c.removeAttribute('id'); c.classList.add('t-shard');
+      c.style.cssText = `left:${box.left - scb.left}px;top:${box.top - scb.top}px;width:${box.width}px;height:${box.height}px;margin:0;clip-path:polygon(${pts.map(p => p[0].toFixed(1) + '% ' + p[1].toFixed(1) + '%').join(',')})`;
+      scr.appendChild(c);
+      const mx = (a.p[0] + b.p[0]) / 2 - lx, my = (a.p[1] + b.p[1]) / 2 - ly, m = Math.hypot(mx, my) || 1;
+      const dx = mx / m * (60 + Math.random() * 120), dy = my / m * 60 + 380 + Math.random() * 200, rot = (Math.random() - 0.5) * 80;
+      c.animate([{ transform: 'translate(0,0) rotate(0)', opacity: 1 }, { transform: `translate(${dx * 0.3}px,${my / m * 20 - 30}px) rotate(${rot * 0.3}deg)`, opacity: 1, offset: 0.25 }, { transform: `translate(${dx}px,${dy}px) rotate(${rot}deg)`, opacity: 0 }], { duration: 900 + Math.random() * 250, easing: 'cubic-bezier(.3,0,.9,.6)', fill: 'forwards' });
+    }
+    scr.classList.add('broken'); svg.innerHTML = '';
+    sfx.glass(1); setTimeout(() => sfx.glass(0.7), 70); setTimeout(() => sfx.ceramic(0.6), 150);
+    $('#tFlash').animate([{ opacity: 0.85 }, { opacity: 0 }], { duration: 260, easing: 'ease-out' });
+  }, 700);
+  setTimeout(() => {
+    show('stage');
+    scr.classList.remove('broken'); scr.querySelectorAll('.t-shard').forEach(e => e.remove());
+    titleBusy = false;
+  }, 1750);
+}
+$('#titleScreen').addEventListener('click', shatterTitle);
+// メニューのボタンはピッと鳴って一瞬光る
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.screen.arcade button');
+  if (!b) return;
+  sfx.unlock(); sfx.blip();
+  b.classList.add('hit'); setTimeout(() => b.classList.remove('hit'), 180);
+}, true);
 
 const TUT_THROW = 'ここを押さえたまま、<br>スマホを振ってみよう';
 const TUT_HAMMER = 'ここを押さえたまま、<br>スマホを振り下ろしてみよう';
@@ -58,6 +134,7 @@ async function enterStage(type, hammerKind) {
 }
 document.querySelectorAll('#hammerScreen [data-hk]').forEach(b => b.addEventListener('click', () => enterStage('hammer', b.dataset.hk)));
 $('#hammerBack').addEventListener('click', () => show('stage'));
+$('#itemBack').addEventListener('click', () => show('stage'));
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));
 $('#stageWarehouse').addEventListener('click', () => enterStage('warehouse'));
 $('#stageCar').addEventListener('click', () => enterStage('car'));
@@ -226,7 +303,7 @@ $('#carousel').addEventListener('click', (e) => { if (e.target === $('#carousel'
 $('#menuBtn').addEventListener('click', () => {
   if (holding) return;
   const k = haptics.kind;
-  $('#hapNote').textContent = k === 'native' ? '振動：アプリ（Core Haptics）' : k === 'vibrate' ? '振動：ブラウザの振動機能' : k === 'ios-switch' ? '振動：iPhoneのブラウザ用の裏技（軽いコツッだけ・iOS 18以降）。しっかり振動させるならアプリ版で。' : 'この環境では振動は出ません（iPhoneのブラウザなど）。アプリ版で動きます。';
+  $('#hapNote').textContent = k === 'native' ? '振動：アプリ（Core Haptics）' : k === 'vibrate' ? '振動：ブラウザの振動機能' :  'この環境では振動は出ません（iPhoneのブラウザなど）。アプリ版で動きます。';
   $('#menu').hidden = false;
 });
 $('#mClose').addEventListener('click', () => { $('#menu').hidden = true; });
@@ -266,9 +343,9 @@ function frame(now) {
   // 補充されたら、押さえたままなら次の投擲を受け付ける
   if (holding && !det.armed && world.handReady && now > lockUntil) { det.arm(); haptics.hold(); }
   if (!holding && now > lockUntil) document.body.classList.remove('locked');
-  world.update(dt);
+  if (mode === 'play') world.update(dt); // メニュー中は3Dを止める（画面は不透明）
   if (debugOn && mode === 'play') renderDebug();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-show('stage');
+show('title');

@@ -164,6 +164,17 @@ class Sfx {
     return () => { try { g.gain.cancelScheduledValues(ac.currentTime); g.gain.setValueAtTime(0.0001, ac.currentTime); o.stop(ac.currentTime + 0.02); } catch (e) { /* 無視 */ } };
   }
 
+  // ゲームセンターのコイン投入音
+  coin() {
+    if (!this.ac) return; const t = this.t;
+    this.tone(t, 988, 988, 0.08, 'square', 0.12); this.tone(t + 0.08, 1319, 1319, 0.35, 'square', 0.12);
+  }
+  // メニューを選ぶピッ
+  blip() {
+    if (!this.ac || !this.throttle('blip', 0.05)) return; const t = this.t;
+    this.tone(t, 660, 880, 0.07, 'square', 0.08);
+  }
+
   // 電気がバチッとショートする音
   zap() {
     if (!this.ac || !this.throttle('zap', 0.08)) return; const t = this.t;
