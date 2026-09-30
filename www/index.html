@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#121314">
-<title>壊 SMASH ROOM Demo v0.1</title>
+<title>それはあなたの本性です Demo v0.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=DotGothic16&family=Press+Start+2P&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
@@ -113,7 +113,7 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 .t-stage{position:relative;display:grid;place-items:center;z-index:2}
 .t-logo-wrap{position:relative;text-align:center;padding:24px 10px}
 .t-kicker{margin:0 0 14px;font-family:var(--f-px);font-size:10px;color:#ffcf5a;letter-spacing:.2em}
-.t-logo{position:relative;margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(150px,50vw,240px);line-height:1;color:#fff;text-shadow:0 0 6px rgba(255,43,61,.9),0 0 22px rgba(255,43,61,.6),4px 4px 0 #7a0012}
+.t-logo{position:relative;margin:0;font-family:var(--f-display);font-weight:400;font-size:clamp(52px,17vw,92px);line-height:1.12;color:#fff;text-shadow:0 0 6px rgba(255,43,61,.9),0 0 22px rgba(255,43,61,.6),4px 4px 0 #7a0012}
 .t-logo::before,.t-logo::after{content:attr(data-text);white-space:pre;position:absolute;inset:0;pointer-events:none;text-shadow:none;opacity:.8}
 .t-logo::before{color:var(--neon2);transform:translate(-3px,0);mix-blend-mode:screen;animation:glitchA 3.4s steps(1) infinite}
 .t-logo::after{color:var(--neon);transform:translate(3px,0);mix-blend-mode:screen;animation:glitchB 3.4s steps(1) infinite}
@@ -134,7 +134,7 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 .a-head{display:grid;gap:8px;margin-bottom:4px}
 .a-kick{margin:0;font-family:var(--f-px);font-size:11px;letter-spacing:.14em;color:var(--neon);text-shadow:0 0 8px rgba(255,43,61,.7)}
 .a-kick::after{content:"_";animation:blink 1s steps(1) infinite}
-.a-logo{margin:0;font-family:var(--f-display);font-size:34px;line-height:1.1;color:#fff;text-shadow:0 0 8px rgba(255,43,61,.8),3px 3px 0 #7a0012}
+.a-logo{margin:0;font-family:var(--f-display);font-size:24px;line-height:1.1;color:#fff;text-shadow:0 0 8px rgba(255,43,61,.8),3px 3px 0 #7a0012}
 .a-title{margin:0;font-family:var(--f-dot);font-size:26px;color:#fff}
 .screen.arcade .stage-card{position:relative;background:rgba(10,8,12,.9);border:2px solid rgba(255,43,61,.55);border-left-width:2px;border-radius:2px;padding:14px 16px 14px 34px;box-shadow:0 0 0 1px rgba(0,0,0,.6) inset,0 0 14px rgba(255,43,61,.18);transition:background .08s,box-shadow .08s}
 .screen.arcade .stage-card i{font-style:normal;font-family:var(--f-px);font-size:9px;letter-spacing:.12em;color:var(--neon2)}
@@ -237,9 +237,8 @@ body.holding #wheel,body.locked #wheel{opacity:.35;pointer-events:none}
   <div class="t-stage">
     <div id="tLogo" class="t-logo-wrap">
       <p class="t-kicker">DEMO v0.1</p>
-      <h1 class="t-logo" data-text="壊">壊</h1>
+      <h1 class="t-logo" data-text="それは&#10;あなたの&#10;本性です">それは<br>あなたの<br>本性です</h1>
       <p class="t-en">SMASH ROOM</p>
-      <p class="t-sub">すべてぶっ壊す</p>
     </div>
     <svg id="tCrack" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
   </div>
@@ -250,7 +249,7 @@ body.holding #wheel,body.locked #wheel{opacity:.35;pointer-events:none}
 
 <section id="modeScreen" class="screen arcade" hidden>
   <div class="inner">
-    <div class="a-head"><p class="a-kick">SELECT MODE</p><p class="a-logo">壊 <small>SMASH ROOM</small></p></div>
+    <div class="a-head"><p class="a-kick">SELECT MODE</p><p class="a-logo">それはあなたの本性です</p></div>
     <button class="stage-card mode-card" data-mode="throw" type="button"><i>MODE A / THROW</i><b>ぶん投げる</b><span>グラス、卵、缶を投げて、部屋のものを割る</span></button>
     <button class="stage-card mode-card" data-mode="hammer" type="button"><i>MODE B / HAMMER</i><b>叩き割る</b><span>すぐそばに立って、ハンマーを振り下ろす</span></button>
     <p class="safety">スマホは手から離さずに、しっかり握ったまま振ってください。まわりに人や物がないか確かめてから。</p>
@@ -314,6 +313,6 @@ body.holding #wheel,body.locked #wheel{opacity:.35;pointer-events:none}
 <div id="fade"></div>
 <div id="rotate">縦向きで遊んでください</div>
 
-<script type="module" src="./js/main.js?v=202609301033"></script>
+<script type="module" src="./js/main.js?v=202609301324"></script>
 </body>
 </html>

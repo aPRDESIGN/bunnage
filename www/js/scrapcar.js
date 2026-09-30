@@ -1,8 +1,8 @@
 // ハンマーで叩く廃車（スクラップ工場）。車本体は car.js をそのまま使い、叩く用の窓口だけここで用意する
 import * as THREE from 'three';
-import { Car } from './car.js?v=202609301033';
-import { sfx } from './audio.js?v=202609301033';
-import { haptics } from './haptics.js?v=202609301033';
+import { Car } from './car.js?v=202609301324';
+import { sfx } from './audio.js?v=202609301324';
+import { haptics } from './haptics.js?v=202609301324';
 
 export class ScrapCar {
   constructor(world, center, opts = {}) {
