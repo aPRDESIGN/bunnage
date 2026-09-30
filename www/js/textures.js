@@ -171,31 +171,77 @@ export const canLabels = [
 ];
 
 // 卵の跡（黄身＋白身）
-export const splat = (i) => make('splat' + i, 128, 128, (g, w, h) => {
+export const splat = (i, style = 'egg') => make('splat' + style + i, 256, 256, (g, w, h) => {
   g.clearRect(0, 0, w, h);
   const cx = w / 2, cy = h / 2;
+  const blob = (r0, jag, color, n = 28) => { g.fillStyle = color; g.beginPath(); for (let a = 0; a <= n; a++) { const ang = a / n * Math.PI * 2, r = r0 * (1 + (rnd() - .5) * jag) + (a % 5 === 0 ? r0 * .25 * rnd() : 0); const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r; a ? g.lineTo(x, y) : g.moveTo(x, y); } g.closePath(); g.fill(); };
+  const drops = (n, rmin, rmax, dmin, dmax, color) => { g.fillStyle = color; for (let k = 0; k < n; k++) { const a = rnd() * 6.283, d = dmin + rnd() * (dmax - dmin), r = rmin + rnd() * (rmax - rmin); g.beginPath(); g.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * 1.6, r, a, 0, 7); g.fill(); } };
+  const rays = (n, len, wdt, color) => { g.fillStyle = color; for (let k = 0; k < n; k++) { const a = rnd() * 6.283, l = len * (.5 + rnd() * .6); g.beginPath(); g.moveTo(cx + Math.cos(a - .08) * 30, cy + Math.sin(a - .08) * 30); g.lineTo(cx + Math.cos(a) * l, cy + Math.sin(a) * l); g.lineTo(cx + Math.cos(a + .08) * 30, cy + Math.sin(a + .08) * 30); g.fill(); g.beginPath(); g.arc(cx + Math.cos(a) * l, cy + Math.sin(a) * l, wdt, 0, 7); g.fill(); } };
+  if (style === 'paint') {
+    // 防犯カラーボール：蛍光オレンジが放射状に飛び散る
+    rays(16, 118, 4, 'rgba(255,100,0,.95)');
+    blob(52, .5, 'rgba(255,96,0,.97)');
+    drops(40, 1.5, 5, 55, 122, 'rgba(255,110,10,.95)');
+    const hg = g.createRadialGradient(cx - 12, cy - 14, 2, cx, cy, 50); hg.addColorStop(0, 'rgba(255,220,150,.55)'); hg.addColorStop(1, 'rgba(255,140,40,0)'); g.fillStyle = hg; g.beginPath(); g.arc(cx, cy, 50, 0, 7); g.fill();
+    return;
+  }
+  if (style === 'tomato') {
+    // トマト：赤い果肉と種、ちぎれた皮
+    rays(9, 90, 3, 'rgba(200,24,16,.85)');
+    blob(46, .6, 'rgba(190,22,14,.92)');
+    blob(30, .5, 'rgba(232,58,34,.9)');
+    for (let k = 0; k < 40; k++) { const a = rnd() * 6.283, d = rnd() * 36; g.fillStyle = 'rgba(245,215,120,.95)'; g.beginPath(); g.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 2.4, 1.4, rnd() * 3, 0, 7); g.fill(); }
+    g.fillStyle = 'rgba(255,190,160,.5)'; for (let k = 0; k < 8; k++) { g.beginPath(); g.ellipse(cx + (rnd() - .5) * 50, cy + (rnd() - .5) * 50, 6, 2, rnd() * 3, 0, 7); g.fill(); }
+    drops(22, 1.5, 4, 50, 110, 'rgba(200,24,16,.9)');
+    return;
+  }
+  if (style === 'soil') {
+    blob(60, .7, 'rgba(58,40,26,.75)');
+    for (let k = 0; k < 500; k++) { const a = rnd() * 6.283, d = rnd() * rnd() * 110; g.fillStyle = `rgba(${40 + rnd() * 40},${28 + rnd() * 25},${18 + rnd() * 15},${.6 + rnd() * .4})`; g.fillRect(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1 + rnd() * 3, 1 + rnd() * 3); }
+    return;
+  }
+  // 卵：白身と黄身
   g.fillStyle = 'rgba(245,238,205,.55)';
   g.beginPath();
   for (let a = 0; a <= 24; a++) {
-    const ang = a / 24 * Math.PI * 2, r = 30 + rnd() * 22 + (a % 5 === 0 ? 10 : 0);
+    const ang = a / 24 * Math.PI * 2, r = 60 + rnd() * 44 + (a % 5 === 0 ? 20 : 0);
     const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r;
     a ? g.lineTo(x, y) : g.moveTo(x, y);
   }
   g.closePath(); g.fill();
-  for (let k = 0; k < 7; k++) { g.beginPath(); g.arc(cx + (rnd() - .5) * 100, cy + (rnd() - .5) * 100, 2 + rnd() * 5, 0, 7); g.fill(); }
-  const yx = cx + (rnd() - .5) * 14, yy = cy + (rnd() - .5) * 14;
-  const yg = g.createRadialGradient(yx - 4, yy - 4, 2, yx, yy, 22);
+  for (let k = 0; k < 7; k++) { g.beginPath(); g.arc(cx + (rnd() - .5) * 200, cy + (rnd() - .5) * 200, 4 + rnd() * 10, 0, 7); g.fill(); }
+  const yx = cx + (rnd() - .5) * 28, yy = cy + (rnd() - .5) * 28;
+  const yg = g.createRadialGradient(yx - 8, yy - 8, 4, yx, yy, 44);
   yg.addColorStop(0, 'rgba(255,214,90,1)'); yg.addColorStop(.7, 'rgba(242,170,30,.95)'); yg.addColorStop(1, 'rgba(230,150,20,0)');
-  g.fillStyle = yg; g.beginPath(); g.ellipse(yx, yy, 20 + rnd() * 8, 15 + rnd() * 6, rnd() * 3, 0, 7); g.fill();
-  g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.ellipse(yx - 6, yy - 5, 5, 3, -.5, 0, 7); g.fill();
+  g.fillStyle = yg; g.beginPath(); g.ellipse(yx, yy, 40 + rnd() * 16, 30 + rnd() * 12, rnd() * 3, 0, 7); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.6)'; g.beginPath(); g.ellipse(yx - 12, yy - 10, 10, 6, -.5, 0, 7); g.fill();
 });
 
 // 垂れた跡
-export const drip = () => make('drip', 32, 128, (g, w, h) => {
+export const drip = (style = 'egg') => make('drip' + style, 32, 128, (g, w, h) => {
   g.clearRect(0, 0, w, h);
+  const c = { egg: ['rgba(240,190,60,.8)', 'rgba(245,225,170,.45)', 'rgba(245,225,170,0)'], paint: ['rgba(255,100,0,.95)', 'rgba(255,110,10,.8)', 'rgba(255,110,10,0)'], tomato: ['rgba(200,24,16,.9)', 'rgba(200,40,24,.6)', 'rgba(200,40,24,0)'] }[style] || ['rgba(240,190,60,.8)', 'rgba(245,225,170,.45)', 'rgba(245,225,170,0)'];
   const gr = g.createLinearGradient(0, 0, 0, h);
-  gr.addColorStop(0, 'rgba(240,190,60,.8)'); gr.addColorStop(.8, 'rgba(245,225,170,.45)'); gr.addColorStop(1, 'rgba(245,225,170,0)');
+  gr.addColorStop(0, c[0]); gr.addColorStop(.8, c[1]); gr.addColorStop(1, c[2]);
   g.fillStyle = gr; g.beginPath(); g.moveTo(8, 0); g.lineTo(24, 0); g.lineTo(19, h * .85); g.quadraticCurveTo(16, h, 13, h * .85); g.closePath(); g.fill();
+});
+
+// スマホのロック画面（架空）
+export const lockScreen = () => make('lock', 128, 256, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, w, h); gr.addColorStop(0, '#1d3b6a'); gr.addColorStop(1, '#6a2d5a'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.font = 'bold 34px sans-serif'; g.fillText('0:42', w / 2, 62);
+  g.font = '11px sans-serif'; g.fillText('10月1日 木曜日', w / 2, 80);
+  for (let k = 0; k < 3; k++) { g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(10, 110 + k * 38, w - 20, 30); g.fillStyle = '#fff'; g.textAlign = 'left'; g.font = 'bold 9px sans-serif'; g.fillText(['上司', 'カレンダー', 'グループ(12)'][k], 16, 123 + k * 38); g.font = '8px sans-serif'; g.fillText(['明日の朝イチで確認お願い…', '9:00 定例ミーティング', '未読のメッセージ 48件'][k], 16, 134 + k * 38); }
+  g.fillStyle = 'rgba(255,255,255,.7)'; g.fillRect(w / 2 - 20, h - 10, 40, 3);
+});
+
+// 缶チューハイのラベル（架空）
+export const chuhaiLabel = () => make('chuhai', 256, 128, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#f4f7fb'); gr.addColorStop(1, '#cfe0f0'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#f0d23a'; g.beginPath(); g.ellipse(70, 64, 34, 26, -.3, 0, 7); g.fill();
+  g.fillStyle = '#3f8a2e'; g.beginPath(); g.ellipse(96, 40, 12, 5, .6, 0, 7); g.fill();
+  g.fillStyle = '#1b3f86'; g.font = 'bold 26px sans-serif'; g.fillText('レモン', 130, 58); g.font = 'bold 20px sans-serif'; g.fillText('サワー', 132, 86);
+  g.fillStyle = '#c8261d'; g.fillRect(0, 108, w, 20); g.fillStyle = '#fff'; g.font = 'bold 12px sans-serif'; g.fillText('おさけ', 12, 123);
 });
 
 // 当たった跡（材質ごと）。透明背景に描く
@@ -691,3 +737,114 @@ export const trainLCD = () => make('tlcd', 512, 128, (g, w, h) => {
 export const trainWall = (rx, ry) => make('twall', 128, 128, (g, w, h) => {
   g.fillStyle = '#e8e2d2'; g.fillRect(0, 0, w, h); noise(g, w, h, 1500, .04);
 }, { repeat: [rx, ry] });
+
+// 割れたあとの窓枠に残るガラス（まん中は抜けて、縁にぎざぎざの破片が残る）
+export const paneBroken = (i) => make('pbroken' + i, 256, 256, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  const cx = w * (.4 + rnd() * .2), cy = h * (.4 + rnd() * .2);
+  // 縁から中心に向かって伸びる、ぎざぎざの残りガラス
+  const edge = [];
+  for (let k = 0; k < 28; k++) { const t = k / 28; const side = Math.floor(t * 4), f = t * 4 - side; edge.push(side === 0 ? [f * w, 0] : side === 1 ? [w, f * h] : side === 2 ? [w - f * w, h] : [0, h - f * h]); }
+  for (let k = 0; k < edge.length; k++) {
+    const a = edge[k], b = edge[(k + 1) % edge.length];
+    const depth = .12 + rnd() * .42;
+    const tip = [a[0] + (cx - a[0]) * depth + (rnd() - .5) * 20, a[1] + (cy - a[1]) * depth + (rnd() - .5) * 20];
+    g.fillStyle = `rgba(200,225,235,${.28 + rnd() * .2})`;
+    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(tip[0], tip[1]); g.lineTo(b[0], b[1]); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(tip[0], tip[1]); g.lineTo(b[0], b[1]); g.stroke();
+  }
+  // 縁の近くのひび
+  g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = .8;
+  for (let k = 0; k < 20; k++) { const a = edge[Math.floor(rnd() * edge.length)]; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(a[0] + (cx - a[0]) * rnd() * .3 + (rnd() - .5) * 30, a[1] + (cy - a[1]) * rnd() * .3 + (rnd() - .5) * 30); g.stroke(); }
+});
+
+// ================= 夜の街（細部） =================
+// ビルの外壁（高解像度）：タイル張り、窓枠と手すり、雨だれの汚れ。1枚で6m×6m
+export const facadeHi = (i) => make('facadeHi' + i, 1024, 1024, (g, w, h) => {
+  const base = ['#4a433c', '#3c4147', '#4a4a42', '#523f35'][i % 4];
+  g.fillStyle = base; g.fillRect(0, 0, w, h);
+  // 小口タイルの目地
+  g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 1;
+  for (let y = 0; y < h; y += 12) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); for (let x = (y / 12 % 2) * 12; x < w; x += 24) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 12); g.stroke(); } }
+  noise(g, w, h, 40000, .1);
+  const cols = 3, rows = 4, cw = w / cols, rh = h / rows;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const x = c * cw + 40, y = r * rh + 46, ww = cw - 80, hh = rh - 110;
+    const lit = rnd() < .38, warm = rnd() < .7;
+    // 窓（カーテンやブラインド越しの明かり）
+    const gr = g.createLinearGradient(x, y, x, y + hh);
+    if (lit) { gr.addColorStop(0, warm ? '#f3d49a' : '#c7dcef'); gr.addColorStop(1, warm ? '#b88a4e' : '#7f98b3'); } else { gr.addColorStop(0, '#1c2026'); gr.addColorStop(1, '#0e1013'); }
+    g.fillStyle = gr; g.fillRect(x, y, ww, hh);
+    if (lit && rnd() < .6) { g.fillStyle = 'rgba(0,0,0,.28)'; for (let k = 0; k < hh; k += 7) g.fillRect(x, y + k, ww, 3); }
+    if (!lit) { g.fillStyle = 'rgba(120,140,160,.12)'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + ww * .4, y); g.lineTo(x, y + hh * .6); g.fill(); }
+    // サッシ
+    g.strokeStyle = '#8b8f93'; g.lineWidth = 5; g.strokeRect(x, y, ww, hh); g.lineWidth = 3; g.beginPath(); g.moveTo(x + ww / 2, y); g.lineTo(x + ww / 2, y + hh); g.stroke();
+    // ベランダの手すり
+    g.fillStyle = 'rgba(40,42,46,.95)'; g.fillRect(x - 20, y + hh + 8, ww + 40, 8);
+    for (let k = x - 16; k < x + ww + 20; k += 10) g.fillRect(k, y + hh + 16, 3, 44);
+    g.fillRect(x - 20, y + hh + 58, ww + 40, 6);
+    // 物干し・植木
+    if (rnd() < .3) { g.fillStyle = `hsl(${rnd() * 360},30%,55%)`; g.fillRect(x + rnd() * ww * .6, y + hh + 18, 26, 34); }
+    // 雨だれ
+    g.fillStyle = 'rgba(0,0,0,.18)'; for (let k = 0; k < 5; k++) g.fillRect(x + rnd() * ww, y + hh + 64, 3 + rnd() * 3, 30 + rnd() * 60);
+  }
+});
+
+// エアコンの室外機の前面
+export const acFront = () => make('acfront', 128, 96, (g, w, h) => {
+  g.fillStyle = '#d7d8d4'; g.fillRect(0, 0, w, h); noise(g, w, h, 1500, .1);
+  g.fillStyle = '#6a6c6e'; g.beginPath(); g.arc(46, 48, 36, 0, 7); g.fill();
+  g.strokeStyle = '#d7d8d4'; g.lineWidth = 2; for (let r = 8; r < 36; r += 5) { g.beginPath(); g.arc(46, 48, r, 0, 7); g.stroke(); }
+  g.beginPath(); g.moveTo(10, 48); g.lineTo(82, 48); g.moveTo(46, 12); g.lineTo(46, 84); g.stroke();
+  g.fillStyle = 'rgba(100,70,40,.3)'; g.fillRect(0, h - 10, w, 10);
+});
+
+// 袖看板・スタンド看板（光る四角い看板）
+export const signBox = (text, bg, fg, vertical = true) => make('sbox' + text + bg, vertical ? 128 : 256, vertical ? 256 : 128, (g, w, h) => {
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(255,255,255,.25)'); gr.addColorStop(1, 'rgba(0,0,0,.15)'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (vertical) { const n = [...text].length, fs = Math.min(64, (h - 30) / n); g.font = `bold ${fs}px sans-serif`; [...text].forEach((ch, k) => g.fillText(ch, w / 2, 20 + fs / 2 + k * fs)); }
+  else { g.font = 'bold 60px sans-serif'; g.fillText(text, w / 2, h / 2 + 4); }
+  g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6);
+});
+
+// マンホールの蓋
+export const manhole = () => make('manhole', 256, 256, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = '#3a3a3c'; g.beginPath(); g.arc(128, 128, 124, 0, 7); g.fill();
+  g.strokeStyle = '#262628'; g.lineWidth = 6; g.beginPath(); g.arc(128, 128, 116, 0, 7); g.stroke();
+  g.strokeStyle = '#4c4c4f'; g.lineWidth = 3;
+  for (let k = 0; k < 12; k++) { const a = k / 12 * 6.283; g.beginPath(); g.moveTo(128 + Math.cos(a) * 30, 128 + Math.sin(a) * 30); g.lineTo(128 + Math.cos(a) * 108, 128 + Math.sin(a) * 108); g.stroke(); }
+  for (const r of [30, 60, 90]) { g.beginPath(); g.arc(128, 128, r, 0, 7); g.stroke(); }
+  noise(g, w, h, 5000, .2);
+});
+
+// ビールケースの側面（黄色いプラスチックの格子）
+export const crateSide = () => make('crate', 128, 96, (g, w, h) => {
+  g.fillStyle = '#e3b51f'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#b8900f'; for (let x = 8; x < w - 8; x += 20) g.fillRect(x, 14, 12, h - 28);
+  g.fillStyle = '#f0c93a'; g.fillRect(0, 0, w, 10); g.fillRect(0, h - 10, w, 10);
+  g.fillStyle = '#a31b14'; g.font = 'bold 16px sans-serif'; g.fillText('BEER', 44, 56);
+});
+
+// バーの店内（棚にずらっと並んだ酒瓶）
+export const barInside = () => make('barin', 1024, 512, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#3a2414'); gr.addColorStop(1, '#120a06'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  for (let s = 0; s < 4; s++) {
+    const y = 110 + s * 90;
+    const lg = g.createLinearGradient(0, y - 80, 0, y); lg.addColorStop(0, 'rgba(255,190,110,.0)'); lg.addColorStop(1, 'rgba(255,190,110,.35)'); g.fillStyle = lg; g.fillRect(0, y - 80, w, 80);
+    g.fillStyle = '#6b4424'; g.fillRect(0, y, w, 8);
+    for (let x = 10; x < w - 20;) {
+      const bw = 16 + rnd() * 12, bh = 44 + rnd() * 30, hue = [30, 20, 120, 200, 0, 45][Math.floor(rnd() * 6)];
+      g.fillStyle = `hsla(${hue},55%,${25 + rnd() * 25}%,.95)`; g.fillRect(x, y - bh, bw, bh);
+      g.fillRect(x + bw * .3, y - bh - 14, bw * .4, 14);
+      g.fillStyle = 'rgba(255,240,200,.5)'; g.fillRect(x + 2, y - bh + 4, 3, bh - 8);
+      if (rnd() < .6) { g.fillStyle = '#efe6d0'; g.fillRect(x + 2, y - bh * .55, bw - 4, bh * .25); }
+      x += bw + 4 + rnd() * 6;
+    }
+  }
+  // カウンター
+  g.fillStyle = '#2b180c'; g.fillRect(0, h - 70, w, 70); g.fillStyle = '#8a5a30'; g.fillRect(0, h - 76, w, 8);
+});

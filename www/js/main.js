@@ -1,12 +1,13 @@
-import { World } from './world.js?v=202609300943';
-import { SwingDetector } from './motion.js?v=202609300943';
-import { sfx } from './audio.js?v=202609300943';
-import { haptics, hapticSettings } from './haptics.js?v=202609300943';
+import { World, STAGE_ITEMS, ITEM_NAMES } from './world.js?v=202609301005';
+import { SwingDetector } from './motion.js?v=202609301005';
+import { sfx } from './audio.js?v=202609301005';
+import { haptics, hapticSettings } from './haptics.js?v=202609301005';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const NAMES = { glass: 'グラス', egg: '卵', can: '缶' };
+const NAMES = ITEM_NAMES;
+const ITEM_SOUND = { glass: 'パリーン', egg: 'ベチャッ', can: 'カンッ', bottle: 'ガシャン', paint: 'バシャッ', pot: 'ゴシャッ', phone: 'バキッ', tomato: 'グシャッ', chuhai: 'ベコッ' };
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 無視 */ } }
@@ -131,7 +132,7 @@ async function enterStage(type, hammerKind) {
     show('play');
     if (!store.get('bunnage_tut_hammer')) $('#tutorial').hidden = false;
     setTimeout(checkSensors, 1500);
-  } else show('item');
+  } else { setupItems(type); show('item'); }
 }
 document.querySelectorAll('#hammerScreen [data-hk]').forEach(b => b.addEventListener('click', () => enterStage('hammer', b.dataset.hk)));
 $('#hammerBack').addEventListener('click', () => show('mode'));
@@ -145,13 +146,20 @@ $('#stageStreet').addEventListener('click', () => enterStage('street'));
 $('#stageTrain').addEventListener('click', () => enterStage('train'));
 if (/[?&]car\b/.test(location.search)) $('#stageCar').hidden = false; // 隠しステージ
 
-document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {
+// ステージに合わせて、投げる物の選択肢とダイヤルを入れ替える
+function setupItems(type) {
+  const items = STAGE_ITEMS[type] || STAGE_ITEMS.cg;
+  $('#itemScreen .pick').innerHTML = items.map(k => `<button data-kind="${k}" type="button"><svg><use href="#i-${k}"/></svg>${NAMES[k]}<small>${ITEM_SOUND[k]}</small></button>`).join('');
+  wBuild(items.concat(items));
+}
+$('#itemScreen .pick').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-kind]'); if (!b) return;
   sfx.unlock();
   setItem(b.dataset.kind, false); wShow(b.dataset.kind);
   show('play');
   if (!store.get('bunnage_tut')) $('#tutorial').hidden = false;
   setTimeout(checkSensors, 1500);
-}));
+});
 
 function setItem(kind, tick = true) {
   if (item === kind && world.heldKind === kind) return;
@@ -279,10 +287,14 @@ document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ---------------- アイテムのダイヤル ----------------
 // 回すダイヤル：下から半分のぞく円盤に投げる物が並ぶ。指で円をなぞるように回すと、慣性でくるくる回って一番上の物で止まる
-const WHEEL = { slots: ['glass', 'egg', 'can', 'glass', 'egg', 'can'], step: 60, R: 104, cx: 170, cy: 188 };
+const WHEEL = { slots: [], step: 60, R: 104, cx: 170, cy: 188 };
 const wheelEl = $('#wheel'), wheelDisc = $('#wheelDisc'), wheelItems = $('#wheelItems');
 let wAngle = 0, wVel = 0, wDrag = null, wAnim = false, wLastIdx = 0;
-const wEls = WHEEL.slots.map(k => { const d = document.createElement('div'); d.className = 'w-item'; d.innerHTML = `<svg><use href="#i-${k}"/></svg>`; wheelItems.appendChild(d); return d; });
+let wEls = [];
+function wBuild(slots) {
+  WHEEL.slots = slots; wheelItems.innerHTML = '';
+  wEls = slots.map(k => { const d = document.createElement('div'); d.className = 'w-item'; d.innerHTML = `<svg><use href="#i-${k}"/></svg>`; wheelItems.appendChild(d); return d; });
+}
 function wIndex(a) { const n = WHEEL.slots.length; return ((Math.round(-a / WHEEL.step) % n) + n) % n; }
 function wRender() {
   wheelDisc.style.transform = `rotate(${wAngle}deg)`;

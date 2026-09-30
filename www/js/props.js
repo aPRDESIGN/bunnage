@@ -4,9 +4,9 @@
 //  Swinger ：吊られた物（吊り革、中吊り広告、のれん）。当たると揺れる
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import * as TX from './textures.js?v=202609300943';
-import { sfx } from './audio.js?v=202609300943';
-import { haptics } from './haptics.js?v=202609300943';
+import * as TX from './textures.js?v=202609301005';
+import { sfx } from './audio.js?v=202609301005';
+import { haptics } from './haptics.js?v=202609301005';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -57,13 +57,15 @@ export class Pane {
 
   shatter(point, dir, v = 6) {
     const W = this.world;
-    this.broken = true; this.mesh.visible = false;
+    this.broken = true;
+    // 枠には、ぎざぎざの割れ残りを残す（割れたことがひと目で分かるように）
+    this.mesh.material = new THREE.MeshStandardMaterial({ map: TX.paneBroken(Math.floor(Math.random() * 4)), transparent: true, roughness: 0.05, metalness: 0.2, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 2 });
     if (this.body.world) W.physics.removeBody(this.body);
     for (const d of this.decals) d.parent && d.parent.remove(d);
     // このガラスに付いていた卵などの跡も一緒に落ちる
     W.splats = W.splats.filter(s => { const l = s.position.clone().sub(this.pos); if (Math.abs(l.dot(this.normal)) < 0.03 && l.length() < Math.max(this.w, this.h) * 0.7) { s.parent && s.parent.remove(s); return false; } return true; });
     const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.rotY);
-    const n = Math.round(clamp(this.w * this.h * 40, 14, 60));
+    const n = Math.round(clamp(this.w * this.h * 70, 20, 90));
     for (let i = 0; i < n; i++) {
       const at = this.pos.clone().addScaledVector(right, rand(-this.w / 2, this.w / 2)).add(new THREE.Vector3(0, rand(-this.h / 2, this.h / 2), 0));
       const vel = dir.clone().multiplyScalar(rand(0.3, 1.4) * (0.5 + v * 0.1)).add(new THREE.Vector3(rand(-0.6, 0.6), rand(-0.3, 1.0), rand(-0.6, 0.6)));

@@ -118,6 +118,24 @@ class Sfx {
     for (let i = 0; i < 6; i++) this.nz(t + 0.05 + Math.random() * 0.18, 0.045, 'bandpass', rand(1400, 3200), 4, rand(0.08, 0.16)); // しずくが飛ぶ
   }
 
+  // カラーボールがパンッと割れて塗料が飛ぶ
+  paint(p) {
+    if (!this.ac || !this.throttle('paint', 0.04)) return; const t = this.t;
+    this.nz(t, 0.03, 'highpass', 2500, 0.7, 0.9 * (0.6 + 0.4 * p));
+    this.tone(t, 320, 90, 0.08, 'sine', 0.5);
+    this.nz(t + 0.01, 0.25, 'lowpass', 3000, 0.8, 0.9 * (0.6 + 0.4 * p), 300, 0.004);
+    for (let i = 0; i < 5; i++) this.nz(t + 0.04 + Math.random() * 0.15, 0.04, 'bandpass', rand(1800, 3600), 4, 0.1);
+  }
+  // トマトがグシャッ
+  tomato(p) {
+    if (!this.ac || !this.throttle('tomato', 0.04)) return; const t = this.t;
+    const k = 0.7 + 0.3 * p;
+    this.nz(t, 0.28, 'lowpass', 1800, 0.9, 1.2 * k, 140, 0.004);
+    this.nz(t + 0.01, 0.14, 'bandpass', 520, 1.6, 0.9 * k, 200, 0.003);
+    this.nz(t + 0.03, 0.2, 'bandpass', 1100, 6, 0.35 * k, 400, 0.02);
+    this.tone(t, 160, 45, 0.15, 'sine', 0.6 * k);
+  }
+
   // カンッ（缶）
   can(v) {
     if (!this.ac || !this.throttle('can', 0.035)) return; const t = this.t;
