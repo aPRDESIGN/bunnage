@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609301409';
-import { sfx } from './audio.js?v=202609301409';
-import { Car } from './car.js?v=202609301409';
-import { PlateStack } from './plates.js?v=202609301409';
-import { Monitor } from './monitor.js?v=202609301409';
-import { Pane, Fixture, Swinger } from './props.js?v=202609301409';
-import { ScrapCar } from './scrapcar.js?v=202609301409';
-import { GiantVase } from './vase.js?v=202609301409';
-import { haptics } from './haptics.js?v=202609301409';
+import * as TX from './textures.js?v=202609301416';
+import { sfx } from './audio.js?v=202609301416';
+import { Car } from './car.js?v=202609301416';
+import { PlateStack } from './plates.js?v=202609301416';
+import { Monitor } from './monitor.js?v=202609301416';
+import { Pane, Fixture, Swinger } from './props.js?v=202609301416';
+import { ScrapCar } from './scrapcar.js?v=202609301416';
+import { GiantVase } from './vase.js?v=202609301416';
+import { haptics } from './haptics.js?v=202609301416';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -214,7 +214,9 @@ export class World {
     else if (this.stageType === 'street') this._street();
     else if (this.stageType === 'train') this._train();
     else if (this.stageType === 'car') this._parking();
-    else { this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items(); }
+    else this._room(true); // 何もない個室（壁だけ）。以前のキッチンは _counter などに残してある
+    // 個室では手元灯の代わりに、部屋の真ん中から壁をやわらかく照らす
+    if (this.underLight) this.underLight.position.set(0.1, 1.9, 0.6);
     this._setLightLevel(this.stageType === 'cg' || !this.stageType ? 1 : 0);
     this.resize(this._w || 1, this._h || 1);
     // 写真の明るさに3Dの小物を少し寄せる
@@ -959,10 +961,10 @@ export class World {
     for (const slot of this.vaseSlots) { slot.vase = this._makeTarget(slot.center, { ...slot.opts }); this.vases.push(slot.vase); }
   }
 
-  _room() {
+  _room(plain = false) {
     const { x0, x1, z0, z1, h } = ROOM;
     const W = x1 - x0, D = z1 - z0;
-    const wallMat = (rx, ry) => this.mat('#cfc6b4', 0.9, 0, { map: TX.wallpaper(rx, ry) });
+    const wallMat = (rx, ry) => this.mat(plain ? '#e6e2da' : '#cfc6b4', 0.9, 0, { map: TX.wallpaper(rx, ry) });
     // 床
     const T = 1.0;
     this.box(W, 0.1, D, 0, -0.05, (z0 + z1) / 2, this.mat('#ffffff', 0.55, 0, { map: TX.floor(W / 0.6, D / 1.2) }), { surface: 'floor', pd: [W + 2, T, D + 2], pp: [0, -T / 2, (z0 + z1) / 2] });
@@ -986,6 +988,15 @@ export class World {
     shade.position.set(0, 2.34, 0.5); this.stage.add(shade);
     this.lampMeshes = [lamp, shade];
     { const lb = new CANNON.Body({ mass: 0 }); lb.addShape(new CANNON.Cylinder(0.3, 0.3, 0.08, 12)); lb.position.set(0, 2.33, 0.5); lb.ud = { static: true, surface: 'lamp' }; this.physics.addBody(lb); this.lampBody = lb; }
+    if (plain) {
+      // 右の壁にドアがひとつ（個室だと分かるくらい）
+      const door = this.mat('#d9d4ca', 0.6), trim = this.mat('#b9b2a5', 0.55);
+      this.box(0.03, 1.95, 0.78, x1 - 0.015, 0.975, 1.9, door, { phys: false });
+      this.box(0.04, 0.05, 0.9, x1 - 0.02, 1.97, 1.9, trim, { phys: false });
+      for (const z of [1.49, 2.31]) this.box(0.04, 2.0, 0.05, x1 - 0.02, 1.0, z, trim, { phys: false });
+      this.box(0.05, 0.03, 0.12, x1 - 0.05, 1.0, 1.6, this.mat('#9a9a98', 0.3, 0.8), { phys: false });
+      return;
+    }
     // 左の壁の窓（型板ガラスの引き違い窓）
     const frame = this.mat('#b8bcbf', 0.35, 0.6);
     this.plane(0.72, 0.92, x0 + 0.004, 1.45, 1.15, this.mat('#0c1320', 1), Math.PI / 2); // 窓の外（夜）

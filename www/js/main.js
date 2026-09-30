@@ -1,7 +1,7 @@
-import { World, STAGE_ITEMS, ITEM_NAMES, TOOLS } from './world.js?v=202609301409';
-import { SwingDetector } from './motion.js?v=202609301409';
-import { sfx } from './audio.js?v=202609301409';
-import { haptics, hapticSettings } from './haptics.js?v=202609301409';
+import { World, STAGE_ITEMS, ITEM_NAMES, TOOLS } from './world.js?v=202609301416';
+import { SwingDetector } from './motion.js?v=202609301416';
+import { sfx } from './audio.js?v=202609301416';
+import { haptics, hapticSettings } from './haptics.js?v=202609301416';
 
 // 本番は apr-design.com/game/。GitHub Pages で開かれたら、そちらへ移動する
 if (location.hostname.endsWith('github.io')) location.replace('https://apr-design.com/game/' + location.search);
