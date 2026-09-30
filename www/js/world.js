@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609301324';
-import { sfx } from './audio.js?v=202609301324';
-import { Car } from './car.js?v=202609301324';
-import { PlateStack } from './plates.js?v=202609301324';
-import { Monitor } from './monitor.js?v=202609301324';
-import { Pane, Fixture, Swinger } from './props.js?v=202609301324';
-import { ScrapCar } from './scrapcar.js?v=202609301324';
-import { GiantVase } from './vase.js?v=202609301324';
-import { haptics } from './haptics.js?v=202609301324';
+import * as TX from './textures.js?v=202609301335';
+import { sfx } from './audio.js?v=202609301335';
+import { Car } from './car.js?v=202609301335';
+import { PlateStack } from './plates.js?v=202609301335';
+import { Monitor } from './monitor.js?v=202609301335';
+import { Pane, Fixture, Swinger } from './props.js?v=202609301335';
+import { ScrapCar } from './scrapcar.js?v=202609301335';
+import { GiantVase } from './vase.js?v=202609301335';
+import { haptics } from './haptics.js?v=202609301335';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -24,16 +24,18 @@ const COUNTER_Y = 0.85, COUNTER_FRONT = -0.3;
 
 // 投げる物は実物より一回り大きく（画面で見やすく、当てやすく）
 const THROW_SCALE = 1.3;
+// 叩く道具：重さ、振りの速さ、届く距離
+export const TOOLS = { hammer: { mass: 1.2, vk: 1.0, far: 3.0 }, bat: { mass: 1.0, vk: 1.25, far: 3.4 }, pan: { mass: 1.1, vk: 1.0, far: 3.0 } };
 // やわらかい物（当たってもガラスを割らず、つぶれて跡が残る）
 const SOFT = new Set(['egg', 'paint', 'tomato']);
 // ステージごとの投げる物
 export const STAGE_ITEMS = {
-  cg: ['glass', 'egg', 'can'], warehouse: ['glass', 'egg', 'can'], car: ['glass', 'egg', 'can'],
+  cg: ['glass', 'egg', 'can'], warehouse: ['baseball', 'bowling', 'brick'], car: ['glass', 'egg', 'can'],
   street: ['bottle', 'paint', 'pot'], train: ['phone', 'tomato', 'chuhai']
 };
-export const ITEM_NAMES = { glass: 'グラス', egg: '卵', can: '缶', bottle: 'ビール瓶', paint: 'カラーボール', pot: '植木鉢', phone: 'スマホ', tomato: 'トマト', chuhai: '缶チューハイ' };
+export const ITEM_NAMES = { hammer: 'ハンマー', bat: '金属バット', pan: 'フライパン', baseball: '野球ボール', bowling: 'ボウリングの球', brick: 'レンガ', glass: 'グラス', egg: '卵', can: '缶', bottle: 'ビール瓶', paint: 'カラーボール', pot: '植木鉢', phone: 'スマホ', tomato: 'トマト', chuhai: '缶チューハイ' };
 // 手に持つ・投げるときの大きさ（1なら実物大）
-const ITEM_SCALE = { glass: 1.3, egg: 1.3, can: 1.3, bottle: 1.0, paint: 1.2, pot: 1.0, phone: 1.15, tomato: 1.15, chuhai: 1.1 };
+const ITEM_SCALE = { baseball: 1.15, bowling: 0.75, brick: 0.85, glass: 1.3, egg: 1.3, can: 1.3, bottle: 1.0, paint: 1.2, pot: 1.0, phone: 1.15, tomato: 1.15, chuhai: 1.1 };
 const LIMITS = { activeShards: 140, cans: 40, splats: 120 };
 
 // ---- 破片を1つのメッシュにまとめて描画負荷を抑える ----
@@ -1221,6 +1223,18 @@ export class World {
     return m;
   }
   makeItem(k) {
+    if (k === 'baseball') {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.037, 24, 16), this.mat('#f4f1e8', 0.6, 0, { map: TX.baseball() }));
+      m.userData.color = new THREE.Color('#f4f1e8'); return m;
+    }
+    if (k === 'bowling') {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.108, 32, 22), this.mat('#8a1420', 0.12, 0.1, { map: TX.bowling(), envMapIntensity: 2 }));
+      m.userData.color = new THREE.Color('#8a1420'); return m;
+    }
+    if (k === 'brick') {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.06, 0.1), this.mat('#ffffff', 0.9, 0, { map: TX.brickFace() }));
+      m.userData.color = new THREE.Color('#a4472c'); return m;
+    }
     if (k === 'glass') return this.makeGlass();
     if (k === 'egg') return this.makeEgg();
     if (k === 'bottle') return this.makeBottle('#4a260e', TX.label('beerb', '#f1e2b8', '生ビール', '#8a1a12', '#c8a24a'), [[0, 0], [0.036, 0], [0.036, 0.17], [0.03, 0.2], [0.014, 0.24], [0.014, 0.29], [0.016, 0.295], [0, 0.295]], 0.93);
@@ -1401,7 +1415,7 @@ export class World {
   }
   _refill(delay) { this.refillAt = this.clock + delay + 1e-4; } // 0だと「補充なし」と区別できないので少し足す
  _spawnHeld() {
-    if (this.heldKind === 'hammer') { const h = this.makeHammer(); this.heldMesh = h; this.hand.add(h); this.handT = 0; return; }
+    if (TOOLS[this.heldKind]) { const h = this.heldKind === 'bat' ? this.makeBat() : this.heldKind === 'pan' ? this.makePan() : this.makeHammer(); this.heldMesh = h; this.hand.add(h); this.handT = 0; return; }
     const k = this.heldKind;
     const m = this.makeItem(k);
     m.castShadow = false;
@@ -1429,10 +1443,33 @@ export class World {
     return g;
   }
 
+  makeBat() {
+    const g = new THREE.Group();
+    const al = this.mat('#c9ced3', 0.25, 0.9), tape = this.mat('#1a1a1a', 0.85);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.014, 0.62, 18), al); barrel.position.y = 0.36; g.add(barrel);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.033, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), al); cap.position.y = 0.67; g.add(cap);
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.0145, 0.0145, 0.2, 12), tape); grip.position.y = 0.0; g.add(grip);
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.015, 14), tape); knob.position.y = -0.1; g.add(knob);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0335, 0.0335, 0.03, 18), this.mat('#c8261d', 0.4, 0.3)); band.position.y = 0.55; g.add(band);
+    g.userData.pose = { x: 0.2, z: 0.55 }; g.rotation.set(0.2, 0, 0.55);
+    return g;
+  }
+  makePan() {
+    const g = new THREE.Group();
+    const iron = this.mat('#2a2b2e', 0.45, 0.7), inner = this.mat('#3b3d41', 0.3, 0.8);
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.018), this.mat('#3a2616', 0.7)); handle.position.y = 0.06; g.add(handle);
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.06, 0.012), iron); neck.position.y = 0.19; g.add(neck);
+    const dish = new THREE.Mesh(this.lathe([[0, 0], [0.11, 0], [0.13, 0.04], [0.125, 0.042], [0.105, 0.006], [0, 0.006]], 28), iron);
+    dish.rotation.x = -Math.PI / 2; dish.position.set(0, 0.33, 0.02); g.add(dish);
+    const face = new THREE.Mesh(new THREE.CircleGeometry(0.104, 28), inner); face.position.set(0, 0.33, 0.027); g.add(face);
+    g.userData.pose = { x: 0.35, z: 0.3 }; g.rotation.set(0.35, 0, 0.3);
+    return g;
+  }
+
   // 振り下ろす。当たるのは画面の真ん中の先
   swingHammer(swing) {
     if (!this.heldMesh || this.hammerAnim) return;
-    const v = 3 + 18 * clamp(swing.power - 0.5, 0, 0.5);
+    const v = (3 + 18 * clamp(swing.power - 0.5, 0, 0.5)) * (TOOLS[this.heldKind] || TOOLS.hammer).vk;
     this.hammerAnim = { t: 0, v, struck: false, power: swing.power };
   }
 
@@ -1445,7 +1482,8 @@ export class World {
     const moving = new Set(this.dyn.map(r => r.mesh));
     for (const sb of this.shards) if (sb.ud && sb.ud.mesh) moving.add(sb.ud.mesh);
     const isMoving = (o) => { for (let q = o; q; q = q.parent) if (moving.has(q)) return true; return false; };
-    const rc = new THREE.Raycaster(); rc.near = 0.1; rc.far = 3.0;
+    const tool = TOOLS[this.heldKind] || TOOLS.hammer;
+    const rc = new THREE.Raycaster(); rc.near = 0.1; rc.far = tool.far;
     const cast = (dir) => {
       rc.set(cam.position, dir);
       for (const h of rc.intersectObjects(this.stage.children, true)) {
@@ -1473,7 +1511,9 @@ export class World {
     haptics.hit(clamp(v / 10, 0.4, 1));
     if (res.pc) {
       const [vs, i] = res.pc;
-      if (!vs.drop) vs.hit(i, h.point, v, 1.2, look, 'hammer');
+      this.toolKind = this.heldKind;
+      if (!vs.drop) vs.hit(i, h.point, v, tool.mass, look, 'hammer');
+      this._toolSound(v);
       return true;
     }
     const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : look.clone().negate();
@@ -1484,17 +1524,27 @@ export class World {
     return true;
   }
 
+  // 道具ごとの手応えの音（当たった物の音に重ねる）
+  _toolSound(v) {
+    const k = this.heldKind;
+    if (k === 'bat') sfx.batPing(Math.min(1, v / 12));
+    else if (k === 'pan') sfx.panClang(Math.min(1, v / 10));
+  }
+
   _updateHammer(dt) {
     const h = this.heldMesh, a = this.hammerAnim;
-    if (!h || this.heldKind !== 'hammer') return;
+    if (!h || !TOOLS[this.heldKind]) return;
+    const bat = this.heldKind === 'bat';
     const P = h.userData.pose;
     let rx = P.x, rz = P.z, px = 0, py = 0, pz = 0;
     if (a) {
       a.t += dt;
       const T1 = 0.13, T2 = 0.2, T3 = 0.52;
-      if (a.t < T1) { const k = a.t / T1, e = k * k; rx = lerp(P.x, -1.25, e); rz = lerp(P.z, 0.55, e); px = -0.07 * e; pz = -0.06 * e; py = 0.06 * e; }
-      else if (a.t < T2) { rx = -1.25; rz = 0.55; px = -0.07; pz = -0.06; py = 0.06; }
-      else { const k = Math.min(1, (a.t - T2) / (T3 - T2)), e = 1 - Math.pow(1 - k, 3); rx = lerp(-1.25, P.x, e); rz = lerp(0.55, P.z, e); px = -0.07 * (1 - e); pz = -0.06 * (1 - e); py = 0.06 * (1 - e); }
+      // バットは右肩から左へ横にふり抜く。ほかは振り下ろす
+      const EX = bat ? -1.0 : -1.25, EZ = bat ? 1.55 : 0.55, EPX = bat ? -0.16 : -0.07;
+      if (a.t < T1) { const k = a.t / T1, e = k * k; rx = lerp(P.x, EX, e); rz = lerp(P.z, EZ, e); px = EPX * e; pz = -0.06 * e; py = 0.06 * e; }
+      else if (a.t < T2) { rx = EX; rz = EZ; px = EPX; pz = -0.06; py = 0.06; }
+      else { const k = Math.min(1, (a.t - T2) / (T3 - T2)), e = 1 - Math.pow(1 - k, 3); rx = lerp(EX, P.x, e); rz = lerp(EZ, P.z, e); px = EPX * (1 - e); pz = -0.06 * (1 - e); py = 0.06 * (1 - e); }
       if (!a.struck && a.t >= T1 * 0.85) { a.struck = true; if (!this._strike(a.v)) sfx.whoosh(0.3); }
       if (a.t >= T3) this.hammerAnim = null;
     }
@@ -1515,7 +1565,7 @@ export class World {
     if (ay > 42 * D2R) sy = Math.sign(swing.yaw) * clamp(8 * D2R + (ay - 42 * D2R) * 0.5, 8 * D2R, hHalf * 0.8);
     if (swing.pitch < -32 * D2R) sp = -clamp(30 * D2R + (-swing.pitch - 32 * D2R) * 0.9, 30 * D2R, 65 * D2R);
     else if (swing.pitch > 35 * D2R) sp = 12 * D2R;
-    const speed = 6 + 5 * swing.power;
+    const speed = (6 + 5 * swing.power) * (this.heldKind === 'bowling' ? 0.8 : 1);
     // 画面中央の先にある面までの距離（まっすぐ投げたらそこに当たるように重力分を補正）
     const look = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
     const hit = new THREE.Raycaster(cam.position, look, 0.2, 8).intersectObjects(this.stage.children, true)[0];
@@ -1542,6 +1592,9 @@ export class World {
     const kind = this.heldKind;
     if (kind === 'glass') body = this.addDynamic(mesh, new CANNON.Cylinder(0.034 * S, 0.03 * S, 0.1 * S, 12), 0.26, world, { breakable: true, kind: 'glass', shards: 22, breakV: 0.9, thrown: true }, { sleep: false });
     else if (kind === 'egg') body = this.addDynamic(mesh, new CANNON.Sphere(0.026 * S), 0.08, world, { kind: 'egg', thrown: true }, { sleep: false, material: this.matEgg });
+    else if (kind === 'baseball') body = this.addDynamic(mesh, new CANNON.Sphere(0.037 * S), 0.3, world, { kind: 'ball', thrown: true }, { sleep: false, material: this.matCan });
+    else if (kind === 'bowling') body = this.addDynamic(mesh, new CANNON.Sphere(0.108 * S), 3.2, world, { kind: 'heavy', thrown: true }, { sleep: false });
+    else if (kind === 'brick') body = this.addDynamic(mesh, new CANNON.Box(new CANNON.Vec3(0.105 * S, 0.03 * S, 0.05 * S)), 1.5, world, { breakable: true, kind: 'brick', shards: 16, breakV: 7, thrown: true }, { sleep: false });
     else if (kind === 'bottle') body = this.addDynamic(mesh, new CANNON.Cylinder(0.036 * S, 0.036 * S, 0.295 * S, 12), 0.6, world, { breakable: true, kind: 'glass', shards: 30, breakV: 1.2, thrown: true, liquid: '#e2b64a', item: 'bottle' }, { sleep: false });
     else if (kind === 'paint' || kind === 'tomato') body = this.addDynamic(mesh, new CANNON.Sphere((kind === 'paint' ? 0.03 : 0.034) * S), kind === 'paint' ? 0.12 : 0.15, world, { kind, thrown: true }, { sleep: false, material: this.matEgg });
     else if (kind === 'phone') body = this.addDynamic(mesh, new CANNON.Box(new CANNON.Vec3(0.036 * S, 0.075 * S, 0.004 * S + 0.004)), 0.2, world, { breakable: true, kind: 'phone', shards: 22, breakV: 2.6, thrown: true }, { sleep: false });
@@ -1673,6 +1726,16 @@ export class World {
       switch (ud.kind) {
         case 'egg': case 'paint': case 'tomato':
           if (v > 0.5) { ud.dead = true; this._splat(e.point, e.normal, e.other, v, ud.kind); this._remove(b); }
+          break;
+        case 'ball':
+          if (v > 1) sfx.knock(Math.min(4, v * 0.5), 1.5);
+          break;
+        case 'heavy':
+          if (v > 0.8) { sfx.knock(Math.min(10, v * 1.2), 0.45); if (v > 3) sfx.thunk(v); }
+          break;
+        case 'brick':
+          if (v > ud.breakV) { ud.dead = true; this._break(b, v, e.point, e.normal); }
+          else if (v > 1) sfx.knock(v, 0.7);
           break;
         case 'phone':
           if (v > ud.breakV) { ud.dead = true; this._break(b, v, e.point, e.normal); }
@@ -2080,7 +2143,7 @@ export class World {
       this.handT += dt;
       const k = Math.min(1, this.handT / 0.25), e = 1 - Math.pow(1 - k, 3);
       const grip = this.holding ? 1 : 0;
-      const hb = this.heldKind === 'hammer' ? this._hammerBase || (this._hammerBase = new THREE.Vector3(0.2, -0.36, -0.52)) : this.handBase;
+      const hb = TOOLS[this.heldKind] ? (this.heldKind === 'bat' ? new THREE.Vector3(0.24, -0.42, -0.5) : this._hammerBase || (this._hammerBase = new THREE.Vector3(0.2, -0.36, -0.52))) : this.handBase;
       this.hand.position.set(hb.x - grip * 0.02, hb.y - (1 - e) * 0.2 + grip * 0.03 + Math.sin(this.clock * 1.6) * 0.003, hb.z + grip * 0.03);
       this._updateHammer(dt);
     }

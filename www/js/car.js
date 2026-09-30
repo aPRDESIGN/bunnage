@@ -1,9 +1,9 @@
 // 壊せる車（赤いスポーツカー）：凹むボディ、割れるガラス、ライト、ミラー
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import * as TX from './textures.js?v=202609301324';
-import { sfx } from './audio.js?v=202609301324';
-import { haptics } from './haptics.js?v=202609301324';
+import * as TX from './textures.js?v=202609301335';
+import { sfx } from './audio.js?v=202609301335';
+import { haptics } from './haptics.js?v=202609301335';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -358,8 +358,10 @@ export class Car {
     mesh.updateMatrixWorld(true);
     const lp = mesh.worldToLocal(point.clone());
     const inward = outward.clone().negate().transformDirection(new THREE.Matrix4().copy(mesh.matrixWorld).invert()).normalize();
-    const r = hammer ? 0.3 : 0.14 + 0.1 * s, depth = hammer ? 0.07 : Math.min(0.11, 0.025 + 0.05 * s);
-    const rs = 0.075, ds = hammer ? 0.09 * Math.min(1.3, s) : 0;
+    const tool = this.world.toolKind || 'hammer';
+    // バット：広く浅く（棒の形に長い）。フライパン：平らに広く。ハンマー：小さく深い
+    const r = hammer ? (tool === 'bat' ? 0.4 : tool === 'pan' ? 0.3 : 0.3) : 0.14 + 0.1 * s, depth = hammer ? (tool === 'bat' ? 0.09 : 0.07) : Math.min(0.11, 0.025 + 0.05 * s);
+    const rs = tool === 'pan' ? 0.13 : 0.075, ds = hammer ? (tool === 'bat' ? 0.05 : tool === 'pan' ? 0.06 : 0.09) * Math.min(1.3, s) : 0;
     const v = new THREE.Vector3(), c = new THREE.Color(), bare = new THREE.Color('#a4a8ab'), shade = new THREE.Color('#1e1a16');
     for (let i = 0; i < P.count; i++) {
       v.fromBufferAttribute(P, i);

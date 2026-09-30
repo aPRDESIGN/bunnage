@@ -215,6 +215,19 @@ class Sfx {
     this.nz(t, 0.18, 'bandpass', 700, 1.2, 0.55 * p, 300);
     [283, 419, 677, 1045, 1590].forEach((f, i) => this.tone(t + 0.004, f * rand(0.97, 1.03), f * 0.985, rand(0.5, 1.0) / (1 + i * 0.35), 'sine', 0.09 * p / (1 + i * 0.4)));
   }
+  // 金属バット「カキーン」
+  batPing(p = 1) {
+    if (!this.ac) return; const t = this.t;
+    this.nz(t, 0.03, 'highpass', 3000, 0.7, 0.6 * p);
+    [1320, 2240, 3310].forEach((f, i) => this.tone(t, f, f * 0.99, 0.5 / (1 + i * 0.6), 'sine', 0.16 * p / (1 + i * 0.5)));
+  }
+  // フライパン「カーン」（長く響く）
+  panClang(p = 1) {
+    if (!this.ac) return; const t = this.t;
+    this.nz(t, 0.04, 'bandpass', 2500, 1.2, 0.7 * p);
+    [523, 811, 1187, 1693, 2380].forEach((f, i) => this.tone(t, f, f * 0.995, 1.4 / (1 + i * 0.4), 'sine', 0.2 * p / (1 + i * 0.45)));
+    this.tone(t, 260, 250, 0.6, 'triangle', 0.12 * p);
+  }
   // タイヤのパンク「プシューッ」
   hiss() {
     if (!this.ac) return; const t = this.t;

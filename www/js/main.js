@@ -1,13 +1,13 @@
-import { World, STAGE_ITEMS, ITEM_NAMES } from './world.js?v=202609301324';
-import { SwingDetector } from './motion.js?v=202609301324';
-import { sfx } from './audio.js?v=202609301324';
-import { haptics, hapticSettings } from './haptics.js?v=202609301324';
+import { World, STAGE_ITEMS, ITEM_NAMES, TOOLS } from './world.js?v=202609301335';
+import { SwingDetector } from './motion.js?v=202609301335';
+import { sfx } from './audio.js?v=202609301335';
+import { haptics, hapticSettings } from './haptics.js?v=202609301335';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const NAMES = ITEM_NAMES;
-const ITEM_SOUND = { glass: 'パリーン', egg: 'ベチャッ', can: 'カンッ', bottle: 'ガシャン', paint: 'バシャッ', pot: 'ゴシャッ', phone: 'バキッ', tomato: 'グシャッ', chuhai: 'ベコッ' };
+const ITEM_SOUND = { baseball: 'ガツン', bowling: 'ドゴッ', brick: 'ゴンッ', glass: 'パリーン', egg: 'ベチャッ', can: 'カンッ', bottle: 'ガシャン', paint: 'バシャッ', pot: 'ゴシャッ', phone: 'バキッ', tomato: 'グシャッ', chuhai: 'ベコッ' };
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 無視 */ } }
@@ -124,11 +124,13 @@ async function enterStage(type, hammerKind) {
   world.reset(type);
   world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.24 : type === 'hammer' ? world.hammerPitch : type === 'street' ? 0.02 : type === 'train' ? -0.04 : -0.12;
   const hammer = type === 'hammer';
-  $('#wheel').hidden = hammer; $('#walkHint').hidden = !hammer;
+  $('#wheel').hidden = false; $('#walkHint').hidden = !hammer;
   $('#tutorial').innerHTML = hammer ? TUT_HAMMER : TUT_THROW;
   if (hammer) {
     // 手に持つのはハンマーだけ。アイテム選択は飛ばす
+    // 叩く道具はダイヤルで選ぶ（ハンマー・金属バット・フライパン）
     item = 'hammer'; world.equip('hammer');
+    wBuild(['hammer', 'bat', 'pan', 'hammer', 'bat', 'pan']); wShow('hammer');
     show('play');
     if (!store.get('bunnage_tut_hammer')) $('#tutorial').hidden = false;
     setTimeout(checkSensors, 1500);
@@ -181,7 +183,7 @@ function checkSensors() {
 // ---------------- 投擲 ----------------
 det.onRelease = (sw) => {
   if (!world.heldMesh) return;
-  if (world.heldKind === 'hammer') {
+  if (TOOLS[world.heldKind]) {
     // 振動は当たった瞬間に出す
     world.swingHammer(sw); sfx.whoosh(sw.power * 0.8);
     lastThrow = sw;

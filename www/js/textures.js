@@ -916,3 +916,26 @@ export const dentMark = (i) => make('dentmark' + i, 256, 256, (g, w, h) => {
   // 飛び散った塗装のかけら跡
   for (let k = 0; k < 20; k++) { const a = rnd() * 6.283, d = 36 + rnd() * 40; g.fillStyle = 'rgba(160,165,170,.8)'; g.beginPath(); g.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1.5 + rnd() * 3, 1 + rnd() * 2, rnd() * 3, 0, 7); g.fill(); }
 });
+
+// ================= 倉庫で投げる物 =================
+// 野球ボール（白い革に赤い縫い目）
+export const baseball = () => make('baseball', 256, 128, (g, w, h) => {
+  g.fillStyle = '#f4f1e8'; g.fillRect(0, 0, w, h); noise(g, w, h, 2500, .05);
+  g.strokeStyle = '#c8261d'; g.lineWidth = 2;
+  for (const off of [0, w / 2]) {
+    g.beginPath(); for (let x = 0; x <= w / 2; x += 2) { const y = h / 2 + Math.sin((x / (w / 2)) * Math.PI * 2) * h * .28; x ? g.lineTo(off + x, y) : g.moveTo(off + x, y); } g.stroke();
+    for (let x = 4; x < w / 2; x += 7) { const y = h / 2 + Math.sin((x / (w / 2)) * Math.PI * 2) * h * .28; g.beginPath(); g.moveTo(off + x - 3, y - 5); g.lineTo(off + x + 3, y - 2); g.moveTo(off + x - 3, y + 5); g.lineTo(off + x + 3, y + 2); g.stroke(); }
+  }
+});
+// ボウリングの球（つやのある赤いマーブル模様）
+export const bowling = () => make('bowling', 256, 128, (g, w, h) => {
+  g.fillStyle = '#7a1220'; g.fillRect(0, 0, w, h);
+  for (let k = 0; k < 40; k++) { g.strokeStyle = `rgba(${rnd() < .5 ? '255,120,120' : '40,0,10'},${.2 + rnd() * .3})`; g.lineWidth = 2 + rnd() * 5; g.beginPath(); let x = rnd() * w, y = rnd() * h; g.moveTo(x, y); for (let s = 0; s < 5; s++) { x += (rnd() - .5) * 60; y += (rnd() - .5) * 30; g.lineTo(x, y); } g.stroke(); }
+  g.fillStyle = '#0c0a0a'; for (const [x, y, r] of [[128, 40, 7], [118, 58, 6], [138, 58, 6]]) { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+});
+// レンガの面
+export const brickFace = () => make('brickface', 128, 64, (g, w, h) => {
+  g.fillStyle = '#a4472c'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 1600; i++) { g.fillStyle = `rgba(${rnd() < .5 ? '60,20,10' : '230,160,120'},${.15 + rnd() * .25})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2, 1 + rnd() * 2); }
+  g.fillStyle = 'rgba(210,200,180,.5)'; g.fillRect(0, 0, w, 3); g.fillRect(0, h - 3, w, 3);
+});
