@@ -1,7 +1,7 @@
-import { World, STAGE_ITEMS, ITEM_NAMES, TOOLS } from './world.js?v=202609301422';
-import { SwingDetector } from './motion.js?v=202609301422';
-import { sfx } from './audio.js?v=202609301422';
-import { haptics, hapticSettings } from './haptics.js?v=202609301422';
+import { World, STAGE_ITEMS, ITEM_NAMES, TOOLS } from './world.js?v=202609301434';
+import { SwingDetector } from './motion.js?v=202609301434';
+import { sfx } from './audio.js?v=202609301434';
+import { haptics, hapticSettings } from './haptics.js?v=202609301434';
 
 // 本番は apr-design.com/game/。GitHub Pages で開かれたら、そちらへ移動する
 if (location.hostname.endsWith('github.io')) location.replace('https://apr-design.com/game/' + location.search);
@@ -133,7 +133,7 @@ async function enterStage(type, hammerKind) {
     // 手に持つのはハンマーだけ。アイテム選択は飛ばす
     // 叩く道具はダイヤルで選ぶ（ハンマー・金属バット・フライパン）
     item = 'hammer'; world.equip('hammer');
-    wBuild(['hammer', 'bat', 'pan', 'hammer', 'bat', 'pan']); wShow('hammer');
+    wBuild(['hammer', 'harisen', 'piko', 'pan', 'hammer', 'harisen', 'piko', 'pan']); wShow('hammer');
     show('play');
     if (!store.get('bunnage_tut_hammer')) $('#tutorial').hidden = false;
     setTimeout(checkSensors, 1500);
@@ -297,7 +297,7 @@ const wheelEl = $('#wheel'), wheelDisc = $('#wheelDisc'), wheelItems = $('#wheel
 let wAngle = 0, wVel = 0, wDrag = null, wAnim = false, wLastIdx = 0;
 let wEls = [];
 function wBuild(slots) {
-  WHEEL.slots = slots; wheelItems.innerHTML = '';
+  WHEEL.slots = slots; WHEEL.step = 360 / slots.length; wheelItems.innerHTML = '';
   wEls = slots.map(k => { const d = document.createElement('div'); d.className = 'w-item'; d.innerHTML = `<svg><use href="#i-${k}"/></svg>`; wheelItems.appendChild(d); return d; });
 }
 function wIndex(a) { const n = WHEEL.slots.length; return ((Math.round(-a / WHEEL.step) % n) + n) % n; }

@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609301422';
-import { sfx } from './audio.js?v=202609301422';
-import { Car } from './car.js?v=202609301422';
-import { PlateStack } from './plates.js?v=202609301422';
-import { Monitor } from './monitor.js?v=202609301422';
-import { Pane, Fixture, Swinger } from './props.js?v=202609301422';
-import { ScrapCar } from './scrapcar.js?v=202609301422';
-import { GiantVase } from './vase.js?v=202609301422';
-import { haptics } from './haptics.js?v=202609301422';
+import * as TX from './textures.js?v=202609301434';
+import { sfx } from './audio.js?v=202609301434';
+import { Car } from './car.js?v=202609301434';
+import { PlateStack } from './plates.js?v=202609301434';
+import { Monitor } from './monitor.js?v=202609301434';
+import { Pane, Fixture, Swinger } from './props.js?v=202609301434';
+import { ScrapCar } from './scrapcar.js?v=202609301434';
+import { GiantVase } from './vase.js?v=202609301434';
+import { haptics } from './haptics.js?v=202609301434';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -25,7 +25,7 @@ const COUNTER_Y = 0.85, COUNTER_FRONT = -0.3;
 // 投げる物は実物より一回り大きく（画面で見やすく、当てやすく）
 const THROW_SCALE = 1.3;
 // 叩く道具：重さ、振りの速さ、届く距離
-export const TOOLS = { hammer: { mass: 1.2, vk: 1.0, far: 3.0 }, bat: { mass: 1.0, vk: 1.25, far: 3.4 }, pan: { mass: 1.1, vk: 1.0, far: 3.0 } };
+export const TOOLS = { hammer: { mass: 1.2, vk: 1.0, far: 3.0 }, harisen: { mass: 0.9, vk: 1.3, far: 3.2 }, piko: { mass: 1.0, vk: 1.15, far: 3.2 }, pan: { mass: 1.1, vk: 1.0, far: 3.0 } };
 // やわらかい物（当たってもガラスを割らず、つぶれて跡が残る）
 const SOFT = new Set(['egg', 'paint', 'tomato']);
 // ステージごとの投げる物
@@ -33,7 +33,7 @@ export const STAGE_ITEMS = {
   cg: ['glass', 'egg', 'can'], warehouse: ['baseball', 'bowling', 'brick'], car: ['glass', 'egg', 'can'],
   street: ['bottle', 'paint', 'pot'], train: ['phone', 'tomato', 'chuhai']
 };
-export const ITEM_NAMES = { hammer: 'ハンマー', bat: '木製バット', pan: 'フライパン', baseball: '野球ボール', bowling: 'ボウリングの球', brick: 'レンガ', glass: 'グラス', egg: '卵', can: '缶', bottle: 'ビール瓶', paint: 'カラーボール', pot: '植木鉢', phone: 'スマホ', tomato: 'トマト', chuhai: '缶チューハイ' };
+export const ITEM_NAMES = { hammer: 'ハンマー', harisen: 'ハリセン', piko: 'ピコピコハンマー', pan: 'フライパン', baseball: '野球ボール', bowling: 'ボウリングの球', brick: 'レンガ', glass: 'グラス', egg: '卵', can: '缶', bottle: 'ビール瓶', paint: 'カラーボール', pot: '植木鉢', phone: 'スマホ', tomato: 'トマト', chuhai: '缶チューハイ' };
 // 手に持つ・投げるときの大きさ（1なら実物大）
 const ITEM_SCALE = { baseball: 1.15, bowling: 0.75, brick: 0.85, glass: 1.3, egg: 1.3, can: 1.3, bottle: 1.0, paint: 1.2, pot: 1.0, phone: 1.15, tomato: 1.15, chuhai: 1.1 };
 const LIMITS = { activeShards: 140, cans: 40, splats: 120 };
@@ -1426,7 +1426,7 @@ export class World {
   }
   _refill(delay) { this.refillAt = this.clock + delay + 1e-4; } // 0だと「補充なし」と区別できないので少し足す
  _spawnHeld() {
-    if (TOOLS[this.heldKind]) { const h = this.heldKind === 'bat' ? this.makeBat() : this.heldKind === 'pan' ? this.makePan() : this.makeHammer(); this.heldMesh = h; this.hand.add(h); this.handT = 0; return; }
+    if (TOOLS[this.heldKind]) { const h = this.heldKind === 'harisen' ? this.makeHarisen() : this.heldKind === 'piko' ? this.makePiko() : this.heldKind === 'pan' ? this.makePan() : this.makeHammer(); this.heldMesh = h; this.hand.add(h); this.handT = 0; return; }
     const k = this.heldKind;
     const m = this.makeItem(k);
     m.castShadow = false;
@@ -1454,15 +1454,41 @@ export class World {
     return g;
   }
 
-  makeBat() {
+  makeHarisen() {
     const g = new THREE.Group();
-    // 木製バット（白木に木目、グリップに黒いテープ）
-    const wood = this.mat('#ffffff', 0.55, 0, { map: TX.batWood() }), tape = this.mat('#1a1a1a', 0.85);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.015, 0.64, 20), wood); barrel.position.y = 0.36; g.add(barrel);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.033, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), wood); cap.scale.y = 0.4; cap.position.y = 0.68; g.add(cap);
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.0155, 0.0155, 0.18, 12), tape); grip.position.y = 0.0; g.add(grip);
-    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.02, 14), wood); knob.position.y = -0.1; g.add(knob);
+    // ハリセン：白い紙をじゃばらに折って、根元をテープで巻いたもの
+    const N = 12, L = 0.5, Wt = 0.3, Wb = 0.045, y0 = 0.1, dt = 0.016, db = 0.005;
+    const pos = [], idx = [];
+    for (let i = 0; i <= N; i++) {
+      const k = i / N, zt = (i % 2 ? 1 : -1) * dt, zb = (i % 2 ? 1 : -1) * db;
+      pos.push((k - 0.5) * Wb, y0, zb, (k - 0.5) * Wt, y0 + L, zt);
+      if (i < N) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const paper = new THREE.MeshStandardMaterial({ color: '#fbf8f0', roughness: 0.85, side: THREE.DoubleSide, flatShading: true });
+    g.add(new THREE.Mesh(geo, paper));
+    // 上の縁に赤い線
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(Wt + 0.004, 0.012, 0.036), this.mat('#e0453a', 0.7)); edge.position.y = y0 + L - 0.008; g.add(edge);
+    // 持ち手（紅白のテープ）
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.2, 0.024), this.mat('#e0453a', 0.6)); grip.position.y = 0.0; g.add(grip);
+    for (const y of [-0.06, 0.0, 0.06]) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.018, 0.026), this.mat('#ffffff', 0.6)); b.position.y = y; g.add(b); }
+    g.traverse(o => { o.castShadow = false; });
+    g.scale.setScalar(0.62);
     g.userData.pose = { x: -0.6, z: 0.1 }; g.rotation.set(-0.6, 0, 0.1); // 少し前に倒して構える
+    return g;
+  }
+  makePiko() {
+    const g = new THREE.Group();
+    // ピコピコハンマー：赤いじゃばらの頭、黄色い端と柄
+    const red = this.mat('#e8343a', 0.45), yel = this.mat('#ffd23a', 0.45);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.38, 14), yel); handle.position.y = 0.14; g.add(handle);
+    const pts = []; const R = 0.052, HL = 0.08;
+    for (let k = 0; k <= 12; k++) { const y = -HL + (2 * HL) * k / 12; pts.push(new THREE.Vector2(R * (k % 2 ? 0.86 : 1), y)); }
+    const head = new THREE.Mesh(new THREE.LatheGeometry(pts, 28), red); head.rotation.z = Math.PI / 2; head.position.set(0, 0.35, 0); g.add(head); // 横向きにして、赤いじゃばらが見えるように
+    for (const z of [-HL - 0.012, HL + 0.012]) { const c = new THREE.Mesh(new THREE.CylinderGeometry(R * 1.04, R * 1.04, 0.026, 28), yel); c.rotation.z = Math.PI / 2; c.position.set(z, 0.35, 0); g.add(c); }
+    g.traverse(o => { o.castShadow = false; });
+    g.userData.pose = { x: -0.05, z: 0.28 }; g.rotation.set(-0.05, 0, 0.28);
     return g;
   }
   makePan() {
@@ -1538,20 +1564,21 @@ export class World {
   // 道具ごとの手応えの音（当たった物の音に重ねる）
   _toolSound(v) {
     const k = this.heldKind;
-    if (k === 'bat') sfx.batWood(Math.min(1, v / 12));
+    if (k === 'harisen') sfx.harisen(Math.min(1, v / 10));
+    else if (k === 'piko') sfx.piko(Math.min(1, v / 10));
     else if (k === 'pan') sfx.panClang(Math.min(1, v / 10));
   }
 
   _updateHammer(dt) {
     const h = this.heldMesh, a = this.hammerAnim;
     if (!h || !TOOLS[this.heldKind]) return;
-    const bat = this.heldKind === 'bat';
+    const bat = this.heldKind === 'harisen';
     const P = h.userData.pose;
     let rx = P.x, rz = P.z, px = 0, py = 0, pz = 0;
     if (a) {
       a.t += dt;
       const T1 = 0.13, T2 = 0.2, T3 = 0.52;
-      // どの道具も、前へ振り下ろす（バットは長いので少し深く）
+      // どの道具も、前へ振り下ろす（ハリセンは長いので少し深く）
       const EX = bat ? -1.45 : -1.25, EZ = bat ? 0.3 : 0.55, EPX = bat ? -0.1 : -0.07;
       if (a.t < T1) { const k = a.t / T1, e = k * k; rx = lerp(P.x, EX, e); rz = lerp(P.z, EZ, e); px = EPX * e; pz = -0.06 * e; py = 0.06 * e; }
       else if (a.t < T2) { rx = EX; rz = EZ; px = EPX; pz = -0.06; py = 0.06; }
@@ -2154,7 +2181,7 @@ export class World {
       this.handT += dt;
       const k = Math.min(1, this.handT / 0.25), e = 1 - Math.pow(1 - k, 3);
       const grip = this.holding ? 1 : 0;
-      const hb = TOOLS[this.heldKind] ? (this.heldKind === 'bat' ? new THREE.Vector3(0.24, -0.42, -0.5) : this._hammerBase || (this._hammerBase = new THREE.Vector3(0.2, -0.36, -0.52))) : this.handBase;
+      const hb = TOOLS[this.heldKind] ? (this.heldKind === 'harisen' ? new THREE.Vector3(0.24, -0.42, -0.5) : this._hammerBase || (this._hammerBase = new THREE.Vector3(0.2, -0.36, -0.52))) : this.handBase;
       this.hand.position.set(hb.x - grip * 0.02, hb.y - (1 - e) * 0.2 + grip * 0.03 + Math.sin(this.clock * 1.6) * 0.003, hb.z + grip * 0.03);
       this._updateHammer(dt);
     }

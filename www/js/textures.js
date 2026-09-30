@@ -940,9 +940,4 @@ export const brickFace = () => make('brickface', 128, 64, (g, w, h) => {
   g.fillStyle = 'rgba(210,200,180,.5)'; g.fillRect(0, 0, w, 3); g.fillRect(0, h - 3, w, 3);
 });
 
-// 木製バットの木目
-export const batWood = () => make('batwood', 64, 256, (g, w, h) => {
-  g.fillStyle = '#d8b989'; g.fillRect(0, 0, w, h);
-  for (let k = 0; k < 26; k++) { g.strokeStyle = `rgba(${120 + rnd() * 40},${80 + rnd() * 30},40,${.15 + rnd() * .25})`; g.lineWidth = .8 + rnd() * 1.6; const x = rnd() * w; g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + (rnd() - .5) * 8, h * .3, x + (rnd() - .5) * 8, h * .7, x + (rnd() - .5) * 6, h); g.stroke(); }
-  g.fillStyle = 'rgba(30,20,10,.8)'; g.font = 'bold 14px serif'; g.save(); g.translate(w / 2, h * .35); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.fillText('HOMERUN', 0, 5); g.restore();
-});
+
