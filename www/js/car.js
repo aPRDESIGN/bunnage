@@ -1,17 +1,17 @@
-// 壊せる車：凹むボディ、割れるガラス、ライト、ミラー、防犯アラーム
+// 壊せる車（赤いスポーツカー）：凹むボディ、割れるガラス、ライト、ミラー
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import * as TX from './textures.js?v=202609300334';
-import { sfx } from './audio.js?v=202609300334';
-import { haptics } from './haptics.js?v=202609300334';
+import * as TX from './textures.js?v=202609300342';
+import { sfx } from './audio.js?v=202609300342';
+import { haptics } from './haptics.js?v=202609300342';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 
-// ---- 車の形（ローカル座標：x=前後（前が−）、y=上、z=左右） ----
-const HALF = 2.25, BOT = 0.26, WB = 0.89, PE = 0.3;
-const TOPS = [[-2.25, 0.72], [-2.12, 0.84], [-1.9, 0.9], [-1.18, 0.98], [-0.55, 1.42], [0.78, 1.45], [1.42, 1.04], [2.05, 0.99], [2.25, 0.8]];
+// ---- 車の形（ローカル座標：x=前後（前が−）、y=上、z=左右）。低くて幅の広い2ドアのスポーツカー ----
+const HALF = 2.3, BOT = 0.18, WB = 0.98, WT = 0.68, BELT = 0.88, CAB_T = 0.96, PE = 0.26;
+const TOPS = [[-2.3, 0.5], [-2.22, 0.63], [-1.95, 0.7], [-1.05, 0.82], [-0.28, 1.17], [0.5, 1.2], [1.55, 0.93], [2.12, 0.88], [2.3, 0.64]];
 function top(x) {
   for (let i = 1; i < TOPS.length; i++) if (x <= TOPS[i][0]) {
     const a = TOPS[i - 1], b = TOPS[i], u = (x - a[0]) / (b[0] - a[0]);
@@ -21,18 +21,20 @@ function top(x) {
 }
 const sp = (t) => Math.sign(t) * Math.pow(Math.abs(t), PE);
 function halfW(x, y) {
-  const T = top(x), cab = T > 1.12;
-  const k = cab ? clamp((y - 0.98) / (T - 0.98), 0, 1) : 0;
-  let w = lerp(WB, 0.74, k * k);
-  const e = Math.min(1, (HALF - Math.abs(x)) / 0.4);
-  return w * (0.84 + 0.16 * Math.sqrt(Math.max(0, e)));
+  const T = top(x), cab = T > CAB_T;
+  const k = cab ? clamp((y - BELT) / (T - BELT), 0, 1) : 0;
+  let w = lerp(WB, WT, Math.pow(k, 1.3));
+  // 前後は絞る、後輪の上は少し張り出す
+  const e = Math.min(1, (HALF - Math.abs(x)) / 0.45);
+  w *= 0.8 + 0.2 * Math.sqrt(Math.max(0, e));
+  w *= 1 + 0.03 * Math.exp(-((x - 1.42) ** 2) / 0.2) * (y < BELT ? 1 : 0);
+  return w;
 }
 function shellPoint(x, phi, out = new THREE.Vector3()) {
   const T = top(x), mid = (T + BOT) / 2, hh = (T - BOT) / 2;
   const y = mid + hh * sp(Math.sin(phi));
   return out.set(x, y, halfW(x, y) * sp(Math.cos(phi)));
 }
-// 高さyに対応する角度（+z側）
 function phiAtY(x, y, side) {
   const T = top(x), mid = (T + BOT) / 2, hh = (T - BOT) / 2;
   const q = clamp((y - mid) / hh, -1, 1);
@@ -40,21 +42,19 @@ function phiAtY(x, y, side) {
   const a = Math.asin(clamp(s, -1, 1));
   return side > 0 ? a : Math.PI - a;
 }
-const SIDE_WINDOWS = [
-  { id: 'fr', x0: -0.6, x1: 0.26, side: 1 }, { id: 'rr', x0: 0.42, x1: 1.28, side: 1 },
-  { id: 'fl', x0: -0.6, x1: 0.26, side: -1 }, { id: 'rl', x0: 0.42, x1: 1.28, side: -1 }
-];
-const PHI_A = Math.acos(0.72);
+const WS = [-0.98, -0.32], RW = [0.62, 1.48];
+const SIDE_WINDOWS = [{ id: 'r', x0: -0.3, x1: 0.98, side: 1 }, { id: 'l', x0: -0.3, x1: 0.98, side: -1 }];
+const PHI_A = Math.acos(0.7);
 function isWindow(x, y, phi) {
-  const T = top(x); if (T < 1.15) return false;
+  const T = top(x); if (T < CAB_T + 0.04) return false;
   const c = Math.cos(phi), s = Math.sin(phi);
-  if (x > -1.16 && x < -0.6 && s > 0.3 && Math.abs(c) < 0.72) return true;   // フロント
-  if (x > 0.82 && x < 1.38 && s > 0.3 && Math.abs(c) < 0.72) return true;    // リア
-  if (Math.abs(c) > 0.3 && y > 1.04 && y < T - 0.07 && ((x > -0.6 && x < 0.26) || (x > 0.42 && x < 1.28))) return true;
+  if (x > WS[0] && x < WS[1] && s > 0.3 && Math.abs(c) < 0.7) return true;
+  if (x > RW[0] && x < RW[1] && s > 0.3 && Math.abs(c) < 0.7) return true;
+  if (Math.abs(c) > 0.3 && y > BELT + 0.04 && y < T - 0.05 && x > -0.3 && x < 0.98) return true;
   return false;
 }
 
-const PAINTS = ['#e8e9e6', '#8c1c1c', '#2d3e55', '#1a1a1c', '#b9bec2'];
+const PAINTS = ['#a50e12'];
 let paintIdx = 0;
 
 export class Car {
@@ -65,7 +65,7 @@ export class Car {
     world.stage.add(this.group);
     this.paint = new THREE.Color(PAINTS[paintIdx++ % PAINTS.length]);
     this.bodies = []; this.mirrors = []; this.panes = {}; this.lights = {};
-    this.dents = 0; this.lastHit = 0; this.alarmStop = null; this.alarmUntil = 0; this.blink = 0;
+    this.dents = 0; this.lastHit = 0;
     this._shell(); this._glass(); this._details();
     this.group.updateMatrixWorld(true);
     this.arrive = opts.arrive ? { t: 0 } : null;
@@ -91,8 +91,10 @@ export class Car {
         const phi = (j / M) * Math.PI * 2;
         shellPoint(x, phi, p); pos.push(p.x, p.y, p.z);
         if (isWindow(x, p.y, phi)) c.copy(dark);
-        else if (p.y < 0.38) c.copy(trim);
-        else if (x < -2.12 && p.y > 0.42 && p.y < 0.66 && Math.abs(p.z) < 0.5) c.copy(grille);
+        else if (p.y < 0.26) c.copy(trim);
+        else if (x < -2.14 && p.y > 0.3 && p.y < 0.46 && Math.abs(p.z) < 0.62) c.copy(grille);      // 下の大きな吸気口
+        else if (x > 2.18 && p.y < 0.4) c.copy(grille);                                            // ディフューザー
+        else if (Math.abs(x - 0.9) < 0.3 && p.y > 0.4 && p.y < 0.62 && Math.abs(Math.cos(phi)) > 0.85) c.copy(grille); // 横の吸気口
         else c.copy(this.paint);
         col.push(c.r, c.g, c.b);
       }
@@ -111,7 +113,7 @@ export class Car {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     g.setIndex(idx); g.computeVertexNormals();
-    const mat = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.32, metalness: 0.35, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.2 });
+    const mat = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.28, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.5 });
     this.shell = new THREE.Mesh(g, mat); this.shell.castShadow = true; this.shell.receiveShadow = true;
     this.group.add(this.shell);
   }
@@ -136,46 +138,55 @@ export class Car {
       this.panes[id] = { id, mesh: m, type, broken: false, cracks: 0, center: cen, normal: n, du, w, h };
     };
     const off = (x, phi, q, k = 0.012) => { shellPoint(x, phi, q); const n2 = shellPoint(x, phi + 0.01, new THREE.Vector3()).sub(q); const n1 = shellPoint(x + 0.01, phi, new THREE.Vector3()).sub(q); const n = new THREE.Vector3().crossVectors(n1, n2).normalize(); const outward = new THREE.Vector3(0, q.y - 0.8, q.z); if (n.dot(outward) < 0) n.negate(); return q.addScaledVector(n, k); };
-    make('front', (u, v, q) => off(lerp(-1.14, -0.62, v), lerp(PHI_A + 0.02, Math.PI - PHI_A - 0.02, u), q), 14, 10, 'laminated');
-    make('rear', (u, v, q) => off(lerp(0.84, 1.36, v), lerp(PHI_A + 0.02, Math.PI - PHI_A - 0.02, u), q), 14, 10, 'tempered');
+    make('front', (u, v, q) => off(lerp(WS[0] + 0.03, WS[1] - 0.03, v), lerp(PHI_A + 0.02, Math.PI - PHI_A - 0.02, u), q), 14, 10, 'laminated');
+    make('rear', (u, v, q) => off(lerp(RW[0] + 0.03, RW[1] - 0.03, v), lerp(PHI_A + 0.02, Math.PI - PHI_A - 0.02, u), q), 14, 10, 'tempered');
     for (const w of SIDE_WINDOWS) {
-      make(w.id, (u, v, q) => { const x = lerp(w.x0 + 0.02, w.x1 - 0.02, u); const T = top(x); const y = lerp(1.06, T - 0.09, v); return off(x, phiAtY(x, y, w.side), q); }, 10, 6, 'tempered');
+      make(w.id, (u, v, q) => { const x = lerp(w.x0 + 0.02, w.x1 - 0.02, u); const T = top(x); const y = lerp(BELT + 0.05, T - 0.06, v); return off(x, phiAtY(x, y, w.side), q); }, 12, 6, 'tempered');
     }
   }
 
   // ---- タイヤ、ライト、ナンバー、ミラー ----
   _details() {
     const G = this.group;
-    const tire = new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.9 });
-    const rim = new THREE.MeshStandardMaterial({ color: '#b8bcc0', roughness: 0.25, metalness: 0.9 });
-    for (const x of [-1.38, 1.36]) for (const z of [-0.8, 0.8]) {
-      const t = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 28), tire); t.rotation.x = Math.PI / 2; t.position.set(x, 0.32, z); t.castShadow = true; G.add(t);
-      const r = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.225, 20), rim); r.rotation.x = Math.PI / 2; r.position.set(x, 0.32, z); G.add(r);
+    const tire = new THREE.MeshStandardMaterial({ color: '#111111', roughness: 0.9 });
+    const rim = new THREE.MeshStandardMaterial({ color: '#2e3134', roughness: 0.25, metalness: 0.9 });
+    for (const x of [-1.46, 1.42]) for (const z of [-0.84, 0.84]) {
+      const r0 = x > 0 ? 0.34 : 0.33, sgn = Math.sign(z);
+      const t = new THREE.Mesh(new THREE.CylinderGeometry(r0, r0, 0.25, 32), tire); t.rotation.x = Math.PI / 2; t.position.set(x, r0, z); t.castShadow = true; G.add(t);
+      // ホイール：外側の面に5本スポーク
+      const face = new THREE.Group(); face.position.set(x, r0, z + sgn * 0.127); G.add(face);
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(0.24, 32), new THREE.MeshStandardMaterial({ color: '#1a1b1d', roughness: 0.6 })); if (sgn < 0) disc.rotation.y = Math.PI; face.add(disc);
+      for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2; const sp2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.22, 0.02), rim); sp2.position.set(Math.cos(a) * 0.11, Math.sin(a) * 0.11, sgn * 0.01); sp2.rotation.z = a - Math.PI / 2; face.add(sp2); }
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.235, 0.012, 8, 32), rim); ring.position.z = sgn * 0.01; face.add(ring);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 12), rim); hub.rotation.x = Math.PI / 2; hub.position.z = sgn * 0.015; face.add(hub);
     }
     const lamp = (id, x, y, z, color, emissive, w, h) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.06, h, w), new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.25, roughness: 0.1, metalness: 0.2 }));
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.06, h, w), new THREE.MeshStandardMaterial({ color, emissive, emissiveIntensity: 0.35, roughness: 0.1, metalness: 0.2 }));
       m.position.set(x, y, z); G.add(m);
       this.lights[id] = { id, mesh: m, broken: false, base: emissive };
     };
-    lamp('hl', -2.2, 0.72, 0.6, '#dfe6ea', '#fff6dd', 0.36, 0.12); lamp('hr', -2.2, 0.72, -0.6, '#dfe6ea', '#fff6dd', 0.36, 0.12);
-    lamp('tl', 2.2, 0.82, 0.62, '#7a0d0d', '#ff2a1a', 0.3, 0.12); lamp('tr', 2.2, 0.82, -0.62, '#7a0d0d', '#ff2a1a', 0.3, 0.12);
-    // ウインカー（アラームで点滅）
+    // 細いヘッドライトと横長のテールランプ
+    lamp('hl', -2.06, 0.6, 0.6, '#b9c4cc', '#fff6dd', 0.3, 0.045); lamp('hr', -2.06, 0.6, -0.6, '#b9c4cc', '#fff6dd', 0.3, 0.045);
+    lamp('tl', 2.23, 0.78, 0.6, '#6a0a0a', '#ff2a1a', 0.42, 0.05); lamp('tr', 2.23, 0.78, -0.6, '#6a0a0a', '#ff2a1a', 0.42, 0.05);
     this.blinkers = [];
-    for (const [x, z] of [[-2.18, 0.84], [-2.18, -0.84], [2.18, 0.84], [2.18, -0.84]]) {
-      const b = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.1), new THREE.MeshStandardMaterial({ color: '#b86a12', emissive: '#ff8c1a', emissiveIntensity: 0 }));
-      b.position.set(x, 0.62, z); G.add(b); this.blinkers.push(b);
-    }
-    for (const x of [-2.26, 2.26]) {
+    // リアウイング
+    const carbon = new THREE.MeshStandardMaterial({ color: '#141516', roughness: 0.35, metalness: 0.4 });
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.025, 1.6), carbon); wing.position.set(2.0, 1.06, 0); wing.rotation.z = -0.06; G.add(wing);
+    for (const z of [-0.5, 0.5]) { const st = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.03), carbon); st.position.set(2.0, 0.97, z); G.add(st); }
+    // マフラー4本
+    const chrome = new THREE.MeshStandardMaterial({ color: '#c9ccce', roughness: 0.2, metalness: 1 });
+    for (const z of [-0.36, -0.22, 0.22, 0.36]) { const e = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.12, 16), chrome); e.rotation.z = Math.PI / 2; e.position.set(2.27, 0.27, z); G.add(e); }
+    for (const x of [-2.31, 2.31]) {
       const p = new THREE.Mesh(new THREE.PlaneGeometry(0.33, 0.165), new THREE.MeshStandardMaterial({ map: TX.plate(), roughness: 0.5 }));
-      p.position.set(x, 0.5, 0); p.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2; G.add(p);
+      p.position.set(x, x < 0 ? 0.36 : 0.5, 0); p.rotation.y = x < 0 ? -Math.PI / 2 : Math.PI / 2; G.add(p);
     }
     // ミラー（当たると落ちる）
     for (const s of [1, -1]) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.18), new THREE.MeshPhysicalMaterial({ color: this.paint, roughness: 0.3, metalness: 0.3, clearcoat: 1 }));
-      const glassM = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.08), new THREE.MeshStandardMaterial({ color: '#9fb2bf', metalness: 1, roughness: 0.05 }));
-      glassM.position.set(0.051, 0, 0); glassM.rotation.y = Math.PI / 2; m.add(glassM);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.07, 0.16), new THREE.MeshPhysicalMaterial({ color: this.paint, roughness: 0.3, metalness: 0.5, clearcoat: 1 }));
+      const glassM = new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.055), new THREE.MeshStandardMaterial({ color: '#9fb2bf', metalness: 1, roughness: 0.05 }));
+      glassM.position.set(0.061, 0, 0); glassM.rotation.y = Math.PI / 2; m.add(glassM);
       m.userData.color = this.paint.clone();
-      this.mirrors.push({ mesh: m, local: new THREE.Vector3(-0.5, 1.07, s * 0.98), body: null });
+      this.mirrors.push({ mesh: m, local: new THREE.Vector3(-0.26, 0.95, s * 1.0), body: null });
     }
   }
 
@@ -194,12 +205,11 @@ export class Car {
       W.physics.addBody(b); this.bodies.push(b); return b;
     };
     // 下半分・ボンネット・トランク・屋根
-    add(2.2, 0.27, 0.86, 0, 0.52, 0, 'body');
-    add(0.46, 0.1, 0.84, -1.62, 0.86, 0, 'body');
-    add(0.34, 0.12, 0.84, 1.74, 0.9, 0, 'body');
-    add(0.68, 0.05, 0.7, 0.11, 1.4, 0, 'body');
-    // 柱（Aピラー・Cピラー）の代わりに窓枠の低い壁
-    add(1.0, 0.04, 0.8, 0.35, 1.0, 0, 'body');
+    add(2.24, 0.24, 0.95, 0, 0.42, 0, 'body');
+    add(0.62, 0.09, 0.92, -1.6, 0.7, 0, 'body');
+    add(0.46, 0.1, 0.92, 1.72, 0.8, 0, 'body');
+    add(0.4, 0.04, 0.66, 0.12, 1.16, 0, 'body');
+    add(0.8, 0.05, 0.9, 0.35, 0.84, 0, 'body');
     // ガラス
     for (const p of Object.values(this.panes)) {
       const lq = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(p.du, new THREE.Vector3().crossVectors(p.normal, p.du).normalize(), p.normal));
@@ -223,7 +233,6 @@ export class Car {
   hit(part, point, outward, v, mass, kind) {
     const W = this.world;
     this.lastHit = W.clock;
-    if (v > 2 && kind !== 'shard') this._alarm();
     const E = 0.5 * mass * v * v;
     if (part === 'body') {
       if (kind === 'egg') return;
@@ -290,30 +299,18 @@ export class Car {
     W._puff(point, outward, '#dfe9ee', 0.6);
   }
 
-  _alarm() {
-    const W = this.world;
-    if (W.clock < this.alarmUntil - 7) return; // 鳴り始めたばかりなら延長だけ
-    if (this.alarmStop) this.alarmStop();
-    this.alarmStop = sfx.alarm(8); this.alarmUntil = W.clock + 8;
-  }
-
   // 走り去る
   leave() {
     const W = this.world;
     for (const b of this.bodies) if (b.world) W.physics.removeBody(b);
     this.bodies = [];
     for (const m of this.mirrors) if (m.body && m.body.world && m.body.sleepState === CANNON.Body.SLEEPING) W._remove(m.body);
-    if (this.alarmStop) this.alarmStop();
     this.leaving = { t: 0 };
     sfx.knock(3, 0.5);
   }
 
   update(dt) {
     const W = this.world;
-    // ハザードの点滅
-    const on = W.clock < this.alarmUntil && Math.floor(W.clock * 2.4) % 2 === 0;
-    for (const b of this.blinkers) b.material.emissiveIntensity = on ? 2.5 : 0;
-    for (const l of Object.values(this.lights)) if (!l.broken) l.mesh.material.emissiveIntensity = on && l.id.startsWith('h') ? 1.8 : 0.25;
     if (this.arrive) {
       this.arrive.t = Math.min(1, this.arrive.t + dt / 1.8);
       const e = 1 - Math.pow(1 - this.arrive.t, 3);
