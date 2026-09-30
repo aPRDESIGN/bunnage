@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609301335';
-import { sfx } from './audio.js?v=202609301335';
-import { Car } from './car.js?v=202609301335';
-import { PlateStack } from './plates.js?v=202609301335';
-import { Monitor } from './monitor.js?v=202609301335';
-import { Pane, Fixture, Swinger } from './props.js?v=202609301335';
-import { ScrapCar } from './scrapcar.js?v=202609301335';
-import { GiantVase } from './vase.js?v=202609301335';
-import { haptics } from './haptics.js?v=202609301335';
+import * as TX from './textures.js?v=202609301342';
+import { sfx } from './audio.js?v=202609301342';
+import { Car } from './car.js?v=202609301342';
+import { PlateStack } from './plates.js?v=202609301342';
+import { Monitor } from './monitor.js?v=202609301342';
+import { Pane, Fixture, Swinger } from './props.js?v=202609301342';
+import { ScrapCar } from './scrapcar.js?v=202609301342';
+import { GiantVase } from './vase.js?v=202609301342';
+import { haptics } from './haptics.js?v=202609301342';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -33,7 +33,7 @@ export const STAGE_ITEMS = {
   cg: ['glass', 'egg', 'can'], warehouse: ['baseball', 'bowling', 'brick'], car: ['glass', 'egg', 'can'],
   street: ['bottle', 'paint', 'pot'], train: ['phone', 'tomato', 'chuhai']
 };
-export const ITEM_NAMES = { hammer: 'ハンマー', bat: '金属バット', pan: 'フライパン', baseball: '野球ボール', bowling: 'ボウリングの球', brick: 'レンガ', glass: 'グラス', egg: '卵', can: '缶', bottle: 'ビール瓶', paint: 'カラーボール', pot: '植木鉢', phone: 'スマホ', tomato: 'トマト', chuhai: '缶チューハイ' };
+export const ITEM_NAMES = { hammer: 'ハンマー', bat: '木製バット', pan: 'フライパン', baseball: '野球ボール', bowling: 'ボウリングの球', brick: 'レンガ', glass: 'グラス', egg: '卵', can: '缶', bottle: 'ビール瓶', paint: 'カラーボール', pot: '植木鉢', phone: 'スマホ', tomato: 'トマト', chuhai: '缶チューハイ' };
 // 手に持つ・投げるときの大きさ（1なら実物大）
 const ITEM_SCALE = { baseball: 1.15, bowling: 0.75, brick: 0.85, glass: 1.3, egg: 1.3, can: 1.3, bottle: 1.0, paint: 1.2, pot: 1.0, phone: 1.15, tomato: 1.15, chuhai: 1.1 };
 const LIMITS = { activeShards: 140, cans: 40, splats: 120 };
@@ -314,7 +314,7 @@ export class World {
   _hammerRoom() {
     const K = {
       plates: { opts: { type: 'plates' }, room: 'restaurant', furniture: 'table', r: 1.3, pitch: -0.42 },
-      vase: { opts: { style: 'sometsuke', finishHits: 3 }, room: 'museum', r: 2.6, pitch: -0.12 },
+      vase: { opts: { style: 'sometsuke', finishHits: 6 }, room: 'museum', r: 2.6, pitch: -0.12 },
       stone: { opts: { style: 'stone', tough: true, finishHits: 8 }, room: 'museum', r: 2.6, pitch: -0.12 },
       monitor: { opts: { type: 'monitor' }, room: 'office', furniture: 'desk', r: 1.2, pitch: -0.3 },
       car: { opts: { type: 'scrapcar' }, room: 'scrapyard', r: 3.9, rz: 2.8, pitch: -0.26 }
@@ -1445,12 +1445,12 @@ export class World {
 
   makeBat() {
     const g = new THREE.Group();
-    const al = this.mat('#c9ced3', 0.25, 0.9), tape = this.mat('#1a1a1a', 0.85);
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.014, 0.62, 18), al); barrel.position.y = 0.36; g.add(barrel);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.033, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), al); cap.position.y = 0.67; g.add(cap);
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.0145, 0.0145, 0.2, 12), tape); grip.position.y = 0.0; g.add(grip);
-    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.015, 14), tape); knob.position.y = -0.1; g.add(knob);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0335, 0.0335, 0.03, 18), this.mat('#c8261d', 0.4, 0.3)); band.position.y = 0.55; g.add(band);
+    // 木製バット（白木に木目、グリップに黒いテープ）
+    const wood = this.mat('#ffffff', 0.55, 0, { map: TX.batWood() }), tape = this.mat('#1a1a1a', 0.85);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.015, 0.64, 20), wood); barrel.position.y = 0.36; g.add(barrel);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.033, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), wood); cap.scale.y = 0.4; cap.position.y = 0.68; g.add(cap);
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.0155, 0.0155, 0.18, 12), tape); grip.position.y = 0.0; g.add(grip);
+    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.02, 14), wood); knob.position.y = -0.1; g.add(knob);
     g.userData.pose = { x: 0.2, z: 0.55 }; g.rotation.set(0.2, 0, 0.55);
     return g;
   }
@@ -1527,7 +1527,7 @@ export class World {
   // 道具ごとの手応えの音（当たった物の音に重ねる）
   _toolSound(v) {
     const k = this.heldKind;
-    if (k === 'bat') sfx.batPing(Math.min(1, v / 12));
+    if (k === 'bat') sfx.batWood(Math.min(1, v / 12));
     else if (k === 'pan') sfx.panClang(Math.min(1, v / 10));
   }
 

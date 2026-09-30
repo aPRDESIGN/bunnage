@@ -2,9 +2,9 @@
 // 当たった周りのかけらだけを外す。支えを失ったかけらは崩れ落ちる。
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { sfx } from './audio.js?v=202609301335';
-import { haptics } from './haptics.js?v=202609301335';
-import * as TX from './textures.js?v=202609301335';
+import { sfx } from './audio.js?v=202609301342';
+import { haptics } from './haptics.js?v=202609301342';
+import * as TX from './textures.js?v=202609301342';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -189,7 +189,7 @@ export class GiantVase {
     const E = 0.5 * mass * v * v;
     if (this.tough && kind !== 'vasePiece') return this._hitTough(idx, point, dir, E);
     let R = 0.2 + 0.055 * Math.sqrt(E);
-    if (kind === 'hammer') R *= 0.75;
+    if (kind === 'hammer') R *= 0.55; // 6回くらい叩いて割り切れるように、1回で外れる範囲は小さめ
     if (kind === 'egg') R *= 0.2;
     if (kind === 'vasePiece') R *= 0.6;
     const hitP = this.pieces[idx];

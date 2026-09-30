@@ -221,6 +221,13 @@ class Sfx {
     this.nz(t, 0.03, 'highpass', 3000, 0.7, 0.6 * p);
     [1320, 2240, 3310].forEach((f, i) => this.tone(t, f, f * 0.99, 0.5 / (1 + i * 0.6), 'sine', 0.16 * p / (1 + i * 0.5)));
   }
+  // 木製バット「ゴッ／コーン」（木の乾いた音）
+  batWood(p = 1) {
+    if (!this.ac) return; const t = this.t;
+    this.nz(t, 0.05, 'bandpass', 1400, 2, 0.7 * p);
+    this.tone(t, 520, 430, 0.12, 'triangle', 0.35 * p);
+    this.tone(t, 180, 120, 0.1, 'sine', 0.4 * p);
+  }
   // フライパン「カーン」（長く響く）
   panClang(p = 1) {
     if (!this.ac) return; const t = this.t;
