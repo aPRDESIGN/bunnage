@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300342';
-import { SwingDetector } from './motion.js?v=202609300342';
-import { sfx } from './audio.js?v=202609300342';
-import { haptics, hapticSettings } from './haptics.js?v=202609300342';
+import { World } from './world.js?v=202609300357';
+import { SwingDetector } from './motion.js?v=202609300357';
+import { sfx } from './audio.js?v=202609300357';
+import { haptics, hapticSettings } from './haptics.js?v=202609300357';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -40,7 +40,7 @@ async function enterStage(type) {
   sfx.unlock();
   if (!permAsked) { permAsked = true; await det.requestPermission(); det.start(); }
   world.reset(type);
-  world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.14 : -0.12;
+  world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.24 : -0.12;
   show('item');
 }
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));

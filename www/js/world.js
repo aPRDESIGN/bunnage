@@ -2,11 +2,11 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609300342';
-import { sfx } from './audio.js?v=202609300342';
-import { Car } from './car.js?v=202609300342';
-import { GiantVase } from './vase.js?v=202609300342';
-import { haptics } from './haptics.js?v=202609300342';
+import * as TX from './textures.js?v=202609300357';
+import { sfx } from './audio.js?v=202609300357';
+import { Car } from './car.js?v=202609300357';
+import { GiantVase } from './vase.js?v=202609300357';
+import { haptics } from './haptics.js?v=202609300357';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -244,7 +244,7 @@ export class World {
     }
     const near = new THREE.PointLight('#cfd8e6', 3, 7, 2); near.position.set(0, 2.5, 1.2); this.stage.add(near);
     const key = new THREE.SpotLight('#e9f0ff', 45, 10, 0.7, 0.6, 2);
-    key.position.set(0.7, Hh - 0.15, -2.8); key.target.position.set(0.5, 0.4, -4.5);
+    key.position.set(0.9, Hh - 0.15, -0.6); key.target.position.set(0.75, 0.4, -2.8);
     key.castShadow = true; key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -0.0006; key.shadow.normalBias = 0.02;
     this.stage.add(key, key.target);
     // 柱（下に黄色と黒の帯）
@@ -256,13 +256,13 @@ export class World {
     }
     this.plane(0.5, 0.5, -3.6, 1.9, -3.895, this.mat('#ffffff', 0.5, 0, { map: TX.parkingSign() }));
     // 車と、車に合わせた白線
-    const carPos = new THREE.Vector3(0.5, 0, -4.5), carYaw = 0.75;
+    const carPos = new THREE.Vector3(0.75, 0, -2.8), carYaw = 1.0;
     const line = this.mat('#e9e8e2', 0.8);
     const R = new THREE.Matrix4().makeRotationY(carYaw);
     const put = (lx, lz, len, alongX) => { const p = new THREE.Vector3(lx, 0.004, lz).applyMatrix4(R).add(carPos); const m = this.plane(alongX ? len : 0.12, alongX ? 0.12 : len, p.x, 0.004, p.z, line, carYaw, -Math.PI / 2); m.receiveShadow = true; };
     put(0.2, 1.3, 5.4, true); put(0.2, -1.3, 5.4, true); put(2.9, 0, 2.6, false);
     // 周りのカラーコーン
-    for (const [x, z] of [[-2.2, -1.6], [2.8, -2.0]]) {
+    for (const [x, z] of [[-2.6, -3.4], [3.3, -3.6]]) {
       const c = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 20), this.mat('#e0551f', 0.6)); c.castShadow = true;
       this.addDynamic(c, new CANNON.Cylinder(0.02, 0.16, 0.5, 10), 0.8, new THREE.Vector3(x, 0.251, z), { kind: 'plastic' });
     }
