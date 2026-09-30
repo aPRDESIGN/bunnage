@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609301416';
-import { sfx } from './audio.js?v=202609301416';
-import { Car } from './car.js?v=202609301416';
-import { PlateStack } from './plates.js?v=202609301416';
-import { Monitor } from './monitor.js?v=202609301416';
-import { Pane, Fixture, Swinger } from './props.js?v=202609301416';
-import { ScrapCar } from './scrapcar.js?v=202609301416';
-import { GiantVase } from './vase.js?v=202609301416';
-import { haptics } from './haptics.js?v=202609301416';
+import * as TX from './textures.js?v=202609301419';
+import { sfx } from './audio.js?v=202609301419';
+import { Car } from './car.js?v=202609301419';
+import { PlateStack } from './plates.js?v=202609301419';
+import { Monitor } from './monitor.js?v=202609301419';
+import { Pane, Fixture, Swinger } from './props.js?v=202609301419';
+import { ScrapCar } from './scrapcar.js?v=202609301419';
+import { GiantVase } from './vase.js?v=202609301419';
+import { haptics } from './haptics.js?v=202609301419';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

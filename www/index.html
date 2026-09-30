@@ -263,11 +263,11 @@ body.holding #wheel,body.locked #wheel{opacity:.35;pointer-events:none}
 <section id="stageScreen" class="screen arcade" hidden>
   <div class="inner">
     <div class="a-head"><p class="a-kick">MODE A / THROW</p><p class="a-title">ステージを選べ</p></div>
-    <button id="stageKitchen" class="stage-card" type="button"><i>STAGE 01</i><b>個室</b><span>何もない部屋。壁に向かって思いきり</span></button>
-    <button id="stageWarehouse" class="stage-card" type="button"><i>STAGE 02</i><b>倉庫と巨大な壺</b><span>人の背丈より大きい壺を、ひたすら割る</span></button>
-    <button id="stageStreet" class="stage-card" type="button"><i>STAGE 03</i><b>夜の街</b><span>飲み屋の並ぶ裏通り。ネオンもショーウィンドウも割れる</span></button>
-    <button id="stageTrain" class="stage-card" type="button"><i>STAGE 04</i><b>終電の車内</b><span>誰もいない最終電車。窓も蛍光灯も中吊りも</span></button>
-    <!-- 隠しステージ：URLの最後に ?car を付けたときだけ出る --><button id="stageCar" class="stage-card" type="button" hidden><i>SECRET</i><b>地下駐車場の車</b><span>赤いスポーツカーのガラスを割って、へこませる</span></button>
+    <button id="stageKitchen" class="stage-card" type="button"><i>STAGE 01</i><b>個室</b><span>何もない、白い壁の部屋</span></button>
+    <button id="stageWarehouse" class="stage-card" type="button"><i>STAGE 02</i><b>倉庫と巨大な壺</b><span>天井の高い、古い倉庫</span></button>
+    <button id="stageStreet" class="stage-card" type="button"><i>STAGE 03</i><b>夜の街</b><span>飲み屋の並ぶ、行き止まりの裏通り</span></button>
+    <button id="stageTrain" class="stage-card" type="button"><i>STAGE 04</i><b>終電の車内</b><span>誰もいない最終電車</span></button>
+    <!-- 隠しステージ：URLの最後に ?car を付けたときだけ出る --><button id="stageCar" class="stage-card" type="button" hidden><i>SECRET</i><b>地下駐車場の車</b><span>夜の地下駐車場</span></button>
     <button id="stageBack" class="back" type="button">&lt; BACK</button>
   </div>
 </section>
@@ -275,10 +275,10 @@ body.holding #wheel,body.locked #wheel{opacity:.35;pointer-events:none}
 <section id="hammerScreen" class="screen arcade" hidden>
   <div class="inner">
     <div class="a-head"><p class="a-kick">MODE B / HAMMER</p><p class="a-title">叩くものを選べ</p></div>
-    <button class="stage-card" data-hk="monitor" type="button"><i>深夜のオフィス</i><b>パソコンのモニター</b><span>画面が割れて、最後は机から落ちる</span></button>
-    <button class="stage-card" data-hk="plates" type="button"><i>閉店後の厨房</i><b>皿の山</b><span>積んだ白い皿。叩くとガシャンと崩れる</span></button>
-    <button class="stage-card" data-hk="vase" type="button"><i>夜の美術館</i><b>壺</b><span>大きな壺。3回くらいで割れる</span></button>
-    <button class="stage-card" data-hk="car" type="button"><i>夜のスクラップ工場</i><b>廃車</b><span>どうせ潰す車。ガラスもボディも叩き放題</span></button>
+    <button class="stage-card" data-hk="monitor" type="button"><i>深夜のオフィス</i><b>パソコンのモニター</b><span>みんな帰ったあとのフロア</span></button>
+    <button class="stage-card" data-hk="plates" type="button"><i>閉店後の厨房</i><b>皿の山</b><span>のれんを下ろした定食屋の厨房</span></button>
+    <button class="stage-card" data-hk="vase" type="button"><i>夜の美術館</i><b>壺</b><span>閉館後の展示室</span></button>
+    <button class="stage-card" data-hk="car" type="button"><i>夜のスクラップ工場</i><b>廃車</b><span>投光器だけが点いた、夜のスクラップ置き場</span></button>
     <button id="hammerBack" class="back" type="button">&lt; BACK</button>
   </div>
 </section>
@@ -316,6 +316,6 @@ body.holding #wheel,body.locked #wheel{opacity:.35;pointer-events:none}
 <div id="fade"></div>
 <div id="rotate">縦向きで遊んでください</div>
 
-<script type="module" src="./js/main.js?v=202609301416"></script>
+<script type="module" src="./js/main.js?v=202609301419"></script>
 </body>
 </html>
