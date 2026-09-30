@@ -1,9 +1,9 @@
 // 壊せる車（赤いスポーツカー）：凹むボディ、割れるガラス、ライト、ミラー
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import * as TX from './textures.js?v=202609301005';
-import { sfx } from './audio.js?v=202609301005';
-import { haptics } from './haptics.js?v=202609301005';
+import * as TX from './textures.js?v=202609301013';
+import { sfx } from './audio.js?v=202609301013';
+import { haptics } from './haptics.js?v=202609301013';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -75,11 +75,20 @@ export class Car {
     this.home = pos.clone(); this.yaw = yaw;
     this.group = new THREE.Group(); this.group.position.copy(pos); this.group.rotation.y = yaw;
     world.stage.add(this.group);
-    this.paint = new THREE.Color(PAINTS[paintIdx++ % PAINTS.length]);
+    // 廃車：色あせた塗装にさびとへこみ
+    this.scrap = !!opts.scrap;
+    this.paint = new THREE.Color(this.scrap ? ['#6f7d6c', '#8a4b3a', '#5d6773', '#b3aa92', '#3f4f6a'][Math.floor(Math.random() * 5)] : PAINTS[paintIdx++ % PAINTS.length]);
+    this.rustSeed = Math.random() * 100;
     this.bodies = []; this.mirrors = []; this.panes = {}; this.lights = {};
     this.dents = 0; this.lastHit = 0;
     this._shell(); this._glass(); this._details();
     this.group.updateMatrixWorld(true);
+    if (this.scrap) {
+      // 最初からあちこちへこんでいて、ライトも点かない
+      const P = this.shell.geometry.attributes.position, N = this.shell.geometry.attributes.normal, v = new THREE.Vector3(), n = new THREE.Vector3();
+      for (let k = 0; k < 6; k++) { const i = Math.floor(Math.random() * P.count); v.fromBufferAttribute(P, i); n.fromBufferAttribute(N, i); if (v.y < 0.35) continue; this._dent(this.group.localToWorld(v.clone()), n.transformDirection(this.group.matrixWorld), 0.5 + Math.random() * 0.6); }
+      for (const l of Object.values(this.lights)) { l.mesh.material.emissiveIntensity = 0; l.mesh.material.color.multiplyScalar(0.6); }
+    }
     this.arrive = opts.arrive ? { t: 0 } : null;
     if (this.arrive) { this.group.position.copy(this._offsetPos(-9)); }
     else this._addBodies();
@@ -115,7 +124,13 @@ export class Car {
         else if (x < -2.12 && p.y < 0.42 && Math.abs(p.z) < 0.6) c.copy(grille);                    // 前の吸気口
         else if (x > 2.18 && p.y < 0.4) c.copy(grille);                                            // ディフューザー
         else if (x > 1.02 && x < 1.3 && p.y > 0.44 && p.y < 0.66 - (x - 1.02) * 0.5 && Math.abs(Math.cos(phi)) > 0.85) c.copy(grille); // 横の吸気口
-        else c.copy(this.paint);
+        else if (this.scrap) {
+          // さびの斑点と、下の方ほど汚れる
+          const n = Math.sin(x * 3.1 + this.rustSeed) * Math.sin(phi * 4.3 + this.rustSeed * 0.7) + Math.sin(x * 7.7 - phi * 2.9 + this.rustSeed) * 0.5;
+          c.copy(this.paint).multiplyScalar(0.8 + 0.2 * Math.sin(x * 11 + phi * 5));
+          if (n > 0.55) c.lerp(new THREE.Color('#6b3a1e'), Math.min(1, (n - 0.55) * 2.2));
+          if (p.y < 0.45) c.lerp(new THREE.Color('#3a2e24'), (0.45 - p.y) * 1.6);
+        } else c.copy(this.paint);
         col.push(c.r, c.g, c.b);
       }
     }
@@ -133,7 +148,7 @@ export class Car {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     g.setIndex(idx); g.computeVertexNormals();
-    const mat = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.28, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.5 });
+    const mat = this.scrap ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.35, envMapIntensity: 0.7 }) : new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.28, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.04, envMapIntensity: 1.5 });
     this.shell = new THREE.Mesh(g, mat); this.shell.castShadow = true; this.shell.receiveShadow = true;
     this.group.add(this.shell);
   }

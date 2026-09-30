@@ -848,3 +848,31 @@ export const barInside = () => make('barin', 1024, 512, (g, w, h) => {
   // カウンター
   g.fillStyle = '#2b180c'; g.fillRect(0, h - 70, w, 70); g.fillStyle = '#8a5a30'; g.fillRect(0, h - 76, w, 8);
 });
+
+// ================= スクラップ工場 =================
+// 砂利と土の地面（1枚で2m角）
+export const gravel = (rx, ry) => make('gravel', 512, 512, (g, w, h) => {
+  g.fillStyle = '#4a4540'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 9000; i++) { const t = 50 + rnd() * 90; g.fillStyle = `rgba(${t},${t - 6},${t - 12},${.6 + rnd() * .4})`; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 1 + rnd() * 3.5, 1 + rnd() * 2.5, rnd() * 3, 0, 7); g.fill(); }
+  for (let i = 0; i < 10; i++) { const x = rnd() * w, y = rnd() * h, r = 40 + rnd() * 110; const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, 'rgba(20,16,12,.35)'); rg.addColorStop(1, 'rgba(20,16,12,0)'); g.fillStyle = rg; g.fillRect(x - r, y - r, r * 2, r * 2); }
+}, { repeat: [rx, ry] });
+
+// 金網（透明な背景に菱形の網）
+export const chainLink = (rx, ry) => make('chain', 128, 128, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(170,175,178,1)'; g.lineWidth = 2.2;
+  for (let k = -h; k < w + h; k += 16) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k + h, h); g.stroke(); g.beginPath(); g.moveTo(k + h, 0); g.lineTo(k, h); g.stroke(); }
+  g.fillStyle = 'rgba(120,120,120,1)'; g.fillRect(0, 0, w, 3);
+}, { repeat: [rx, ry] });
+
+// つぶされた車のかたまり（しわくちゃの鉄板とさび）
+export const crushed = (i) => make('crushed' + i, 256, 128, (g, w, h) => {
+  g.fillStyle = '#9a9a9a'; g.fillRect(0, 0, w, h);
+  for (let k = 0; k < 40; k++) { g.fillStyle = `rgba(${rnd() < .5 ? '0,0,0' : '255,255,255'},${.08 + rnd() * .15})`; g.beginPath(); g.moveTo(rnd() * w, rnd() * h); g.lineTo(rnd() * w, rnd() * h); g.lineTo(rnd() * w, rnd() * h); g.fill(); }
+  g.strokeStyle = 'rgba(20,20,20,.5)'; g.lineWidth = 2; for (let k = 0; k < 14; k++) { g.beginPath(); let x = rnd() * w, y = rnd() * h; g.moveTo(x, y); for (let s = 0; s < 4; s++) { x += (rnd() - .5) * 60; y += (rnd() - .5) * 20; g.lineTo(x, y); } g.stroke(); }
+  for (let k = 0; k < 18; k++) { g.fillStyle = `rgba(110,55,25,${.3 + rnd() * .4})`; g.beginPath(); g.ellipse(rnd() * w, rnd() * h, 6 + rnd() * 20, 3 + rnd() * 10, rnd() * 3, 0, 7); g.fill(); }
+  // 窓だった所の黒い穴、タイヤの一部
+  g.fillStyle = 'rgba(10,12,14,.85)'; g.fillRect(40 + rnd() * 80, 20 + rnd() * 40, 40 + rnd() * 40, 14 + rnd() * 10);
+  g.fillStyle = '#141414'; g.beginPath(); g.arc(rnd() * w, h - 10, 22, 0, 7); g.fill();
+  noise(g, w, h, 5000, .15);
+});

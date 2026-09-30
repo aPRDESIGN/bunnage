@@ -2,14 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609301005';
-import { sfx } from './audio.js?v=202609301005';
-import { Car } from './car.js?v=202609301005';
-import { PlateStack } from './plates.js?v=202609301005';
-import { Monitor } from './monitor.js?v=202609301005';
-import { Pane, Fixture, Swinger } from './props.js?v=202609301005';
-import { GiantVase } from './vase.js?v=202609301005';
-import { haptics } from './haptics.js?v=202609301005';
+import * as TX from './textures.js?v=202609301013';
+import { sfx } from './audio.js?v=202609301013';
+import { Car } from './car.js?v=202609301013';
+import { PlateStack } from './plates.js?v=202609301013';
+import { Monitor } from './monitor.js?v=202609301013';
+import { Pane, Fixture, Swinger } from './props.js?v=202609301013';
+import { ScrapCar } from './scrapcar.js?v=202609301013';
+import { GiantVase } from './vase.js?v=202609301013';
+import { haptics } from './haptics.js?v=202609301013';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -313,19 +314,21 @@ export class World {
       plates: { opts: { type: 'plates' }, room: 'restaurant', furniture: 'table', r: 1.3, pitch: -0.42 },
       vase: { opts: { style: 'sometsuke', finishHits: 3 }, room: 'museum', r: 2.6, pitch: -0.12 },
       stone: { opts: { style: 'stone', tough: true, finishHits: 8 }, room: 'museum', r: 2.6, pitch: -0.12 },
-      monitor: { opts: { type: 'monitor' }, room: 'office', furniture: 'desk', r: 1.2, pitch: -0.3 }
+      monitor: { opts: { type: 'monitor' }, room: 'office', furniture: 'desk', r: 1.2, pitch: -0.3 },
+      car: { opts: { type: 'scrapcar' }, room: 'scrapyard', r: 3.9, rz: 2.8, pitch: -0.26 }
     }[this.hammerKind] || { opts: { style: 'sometsuke', finishHits: 3 }, room: 'museum', r: 2.2, pitch: -0.2 };
     const C = new THREE.Vector3(0, 0, -2.3);
     if (K.room === 'museum') this._museum(C, this.hammerKind === 'stone');
     else if (K.room === 'office') this._office(C);
+    else if (K.room === 'scrapyard') this._scrapyard(C);
     else this._restaurant(C);
     const center = C.clone();
     if (K.furniture) center.y = this._furniture(K.furniture, C.x, C.z);
-    else center.y = 0.14;
+    else center.y = K.room === 'scrapyard' ? 0 : 0.14;
     const slot = { center, opts: { ...K.opts }, vase: null, pending: false, cycle: true };
     this.vaseSlots = [slot];
     slot.vase = this._makeTarget(center, { ...slot.opts }); this.vases.push(slot.vase);
-    this.orbitC = C.clone(); this.orbitR = K.r; this.hammerPitch = K.pitch;
+    this.orbitC = C.clone(); this.orbitR = K.r; this.orbitRz = K.rz || null; this.hammerPitch = K.pitch;
   }
 
   // 床・壁・天井（すり抜けないよう当たり判定は厚め）
@@ -358,6 +361,61 @@ export class World {
     spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024); spot.shadow.bias = -0.0006; spot.shadow.normalBias = 0.02;
     this.stage.add(spot, spot.target);
     return spot;
+  }
+
+  // ---- 夜のスクラップ工場 ----
+  _scrapyard(C) {
+    const X = 7.5, Z0 = -9, Z1 = 3.5;
+    const cz = (Z0 + Z1) / 2, D = Z1 - Z0, T = 1.0;
+    const f = this.box(X * 2, 0.1, D, 0, -0.05, cz, this.mat('#ffffff', 0.95, 0, { map: TX.gravel(X, D / 2) }), { surface: 'floor', pd: [X * 2 + 2, T, D + 2], pp: [0, -T / 2, cz] }); f.userData.surface = 'floor';
+    const solid = (x, y, z, w, h, d) => { const b = new CANNON.Body({ mass: 0 }); b.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2))); b.position.set(x, y, z); b.ud = { static: true, surface: 'steel' }; this.physics.addBody(b); };
+    solid(-X - 0.5, 4, cz, 1, 10, D + 2); solid(X + 0.5, 4, cz, 1, 10, D + 2); solid(0, 4, Z0 - 0.5, X * 2 + 2, 10, 1); solid(0, 4, Z1 + 0.5, X * 2 + 2, 10, 1);
+    // 金網のフェンス（まわりを囲う）
+    const fence = this.mat('#ffffff', 0.6, 0.5, { map: TX.chainLink(X * 2 / 1.2, 2), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide });
+    this.plane(X * 2, 2.6, 0, 1.3, Z0, fence, 0); this.plane(D, 2.6, -X, 1.3, cz, fence, Math.PI / 2); this.plane(D, 2.6, X, 1.3, cz, fence, -Math.PI / 2); this.plane(X * 2, 2.6, 0, 1.3, Z1, fence, Math.PI);
+    // 遠くの夜空と工場の影
+    const skyM = new THREE.MeshBasicMaterial({ map: TX.skyline(), color: '#8a8aa0' });
+    this.plane(60, 14, 0, 7, Z0 - 12, skyM, 0); this.plane(60, 14, 0, 7, Z1 + 12, skyM, Math.PI);
+    this.plane(40, 14, -X - 12, 7, cz, skyM, Math.PI / 2); this.plane(40, 14, X + 12, 7, cz, skyM, -Math.PI / 2);
+    // つぶされた車の山（四角いかたまりを積む）
+    const crushCols = ['#6f7d6c', '#8a4b3a', '#5d6773', '#b3aa92', '#3f4f6a', '#7a3030', '#8f8a7a'];
+    const pile = (x, z, cols, rows, rot) => {
+      for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
+        const t = TX.crushed(Math.floor(Math.random() * 3));
+        const off = (k - (cols - 1) / 2) * 2.0;
+        this.box(1.9, 0.6, 1.1, x + off * Math.cos(rot) + (Math.random() - 0.5) * 0.15, 0.3 + r * 0.62, z - off * Math.sin(rot) + (Math.random() - 0.5) * 0.15, this.mat(crushCols[(r * 3 + k) % crushCols.length], 0.75, 0.35, { map: t }), { rotY: rot + (Math.random() - 0.5) * 0.12, surface: 'steel', cast: r === rows - 1 });
+      }
+    };
+    pile(-4.8, -6.8, 3, 4, 0); pile(3.6, -7.2, 3, 5, 0); pile(-6.6, -2.2, 3, 3, Math.PI / 2); pile(6.6, -1.6, 3, 4, Math.PI / 2);
+    // タイヤの山
+    const tireM = this.mat('#161616', 0.9);
+    for (let k = 0; k < 7; k++) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.12, 10, 20), tireM); t.rotation.x = Math.PI / 2; t.position.set(-4.2 + (k % 2) * 0.1, 0.12 + k * 0.24, 1.6); this.stage.add(t); }
+    for (let k = 0; k < 5; k++) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.12, 10, 20), tireM); t.rotation.x = Math.PI / 2; t.position.set(-3.5, 0.12 + k * 0.24, 2.3); this.stage.add(t); }
+    solid(-3.9, 0.9, 1.9, 1.4, 1.8, 1.6);
+    // ドラム缶
+    [['#2f5d8a', 4.4, 1.8], ['#8a2f2f', 5.0, 2.2], ['#c8a22e', 4.7, 1.2]].forEach(([c, x, z]) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.88, 24), this.mat(c, 0.6, 0.4)); m.position.set(x, 0.44, z); m.castShadow = true; this.stage.add(m); solid(x, 0.44, z, 0.58, 0.88, 0.58); });
+    // 油のしみ
+    for (const [x, z, r] of [[0.8, -0.4, 1.2], [-1.4, -3.4, 0.9], [2.5, -3.8, 0.8]]) { const m = new THREE.Mesh(new THREE.CircleGeometry(r, 24), new THREE.MeshStandardMaterial({ color: '#0e0c0a', roughness: 0.1, metalness: 0.6, transparent: true, opacity: 0.7 })); m.rotation.x = -Math.PI / 2; m.scale.set(1.5, 1, 1); m.position.set(x, 0.004, z); this.stage.add(m); }
+    // クレーン（車をつり上げる黄色い腕）
+    const yel = this.mat('#e3b21e', 0.55, 0.4), dark = this.mat('#2a2a2a', 0.6, 0.5);
+    this.box(0.8, 9, 0.8, 5.6, 4.5, -8.0, yel, { surface: 'steel', cast: true });
+    const boom = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 11), yel); boom.position.set(3.2, 9.0, -4.6); boom.rotation.set(0, -0.55, 0); this.stage.add(boom);
+    const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 4.4, 6), dark); cable.position.set(0.6, 6.8, -0.3 - 2.3); this.stage.add(cable);
+    const magnet = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.3, 24), dark); magnet.position.set(0.6, 4.5, -2.6); this.stage.add(magnet);
+    // 投光器（ポールの上のライト）と、警告灯
+    const flood = (x, z, shadow) => {
+      this.box(0.14, 6, 0.14, x, 3, z, this.mat('#555555', 0.6, 0.6), { surface: 'steel' });
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.35, 0.2), this.mat('#ffffff', 0.3, 0, { emissive: '#fff4dc', emissiveIntensity: 1.6 })); head.position.set(x, 6.1, z); head.lookAt(C.x, 0, C.z); this.stage.add(head);
+      const sp = new THREE.SpotLight('#ffe8c4', 80, 22, 0.6, 0.6, 2); sp.position.set(x, 6.1, z); sp.target.position.set(C.x, 0, C.z);
+      if (shadow) { sp.castShadow = true; sp.shadow.mapSize.set(1024, 1024); sp.shadow.bias = -0.0006; sp.shadow.normalBias = 0.02; }
+      this.stage.add(sp, sp.target);
+    };
+    flood(-5.5, 2.4, true); flood(5.8, -4.5, false);
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), this.mat('#ff8a1a', 0.3, 0, { emissive: '#ff7a00', emissiveIntensity: 2 })); beacon.position.set(5.6, 9.1, -8.0); this.stage.add(beacon);
+    const bl = new THREE.PointLight('#ff7a00', 3, 10, 2); bl.position.copy(beacon.position); this.stage.add(bl);
+    let bt = 0; this.animators.push((dt) => { bt += dt; const on = Math.sin(bt * 5) > 0.2; bl.intensity = on ? 3 : 0.2; beacon.material.emissiveIntensity = on ? 2 : 0.2; });
+    const fill = new THREE.PointLight('#8190b0', 3, 14, 2); fill.position.set(0, 4, 2.5); this.stage.add(fill);
+    this.stage.add(new THREE.HemisphereLight('#3a4466', '#1a1410', 0.5));
   }
 
   // ---- 夜の美術館 ----
@@ -819,6 +877,7 @@ export class World {
   _makeTarget(center, opts) {
     if (opts.type === 'plates') return new PlateStack(this, center, opts);
     if (opts.type === 'monitor') return new Monitor(this, center, opts);
+    if (opts.type === 'scrapcar') return new ScrapCar(this, center, opts);
     return new GiantVase(this, center, opts);
   }
   _respawn(slot, delay) {
@@ -1381,7 +1440,7 @@ export class World {
     const cam = this.camera;
     const look = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     this.stage.updateMatrixWorld(true);
-    const pieceOf = (o) => { for (let q = o; q; q = q.parent) for (const vs of this.vases) { const i = vs.pieces.findIndex(p => p.mesh === q && p.attached); if (i >= 0) return [vs, i]; } return null; };
+    const pieceOf = (o) => { for (const vs of this.vases) if (vs.pieceFor) { const i = vs.pieceFor(o); if (i >= 0) return [vs, i]; } for (let q = o; q; q = q.parent) for (const vs of this.vases) { const i = vs.pieces.findIndex(p => p.mesh === q && p.attached); if (i >= 0) return [vs, i]; } return null; };
     // 飛んでいる破片や外れたかけらは素通りして、その奥の本体を叩く
     const moving = new Set(this.dyn.map(r => r.mesh));
     for (const sb of this.shards) if (sb.ud && sb.ud.mesh) moving.add(sb.ud.mesh);
@@ -1390,7 +1449,7 @@ export class World {
     const cast = (dir) => {
       rc.set(cam.position, dir);
       for (const h of rc.intersectObjects(this.stage.children, true)) {
-        if (!h.object.isMesh) continue;
+        if (!h.object.isMesh || !h.object.visible) continue;
         const pc = pieceOf(h.object);
         if (pc) return { pc, h };
         if (isMoving(h.object)) continue;
@@ -2000,9 +2059,11 @@ export class World {
     }
 
     if (this.stageType === 'hammer' && this.orbitC) {
-      const c = this.orbitC, r = this.orbitR;
-      this.camera.position.set(c.x + Math.sin(this.orbitA) * r, EYE.y, c.z + Math.cos(this.orbitA) * r);
-      this.camera.rotation.set(this.pitch, this.orbitA + this.yaw, 0, 'YXZ');
+      const c = this.orbitC, r = this.orbitR, rz = this.orbitRz || r;
+      // 楕円の上を歩く（車のように細長い物のまわりでも近づきすぎない）
+      const px = c.x + Math.sin(this.orbitA) * r, pz = c.z + Math.cos(this.orbitA) * rz;
+      this.camera.position.set(px, EYE.y, pz);
+      this.camera.rotation.set(this.pitch, Math.atan2(px - c.x, pz - c.z) + this.yaw, 0, 'YXZ');
     } else {
       this.camera.position.copy(EYE);
       this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
