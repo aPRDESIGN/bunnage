@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300401';
-import { SwingDetector } from './motion.js?v=202609300401';
-import { sfx } from './audio.js?v=202609300401';
-import { haptics, hapticSettings } from './haptics.js?v=202609300401';
+import { World } from './world.js?v=202609300417';
+import { SwingDetector } from './motion.js?v=202609300417';
+import { sfx } from './audio.js?v=202609300417';
+import { haptics, hapticSettings } from './haptics.js?v=202609300417';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -36,16 +36,34 @@ function show(id) {
   mode = id;
 }
 
+const TUT_THROW = 'ここを押さえたまま、<br>スマホを振ってみよう';
+const TUT_HAMMER = 'ここを押さえたまま、<br>スマホを振り下ろしてみよう';
 async function enterStage(type) {
   sfx.unlock();
   if (!permAsked) { permAsked = true; await det.requestPermission(); det.start(); }
   world.reset(type);
-  world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.24 : -0.12;
-  show('item');
+  world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.24 : type === 'hammer' ? -0.2 : -0.12;
+  const hammer = type === 'hammer';
+  $('#itemBtn').hidden = hammer; $('#targetBar').hidden = !hammer; $('#walkHint').hidden = !hammer;
+  $('#tutorial').innerHTML = hammer ? TUT_HAMMER : TUT_THROW;
+  if (hammer) {
+    // 手に持つのはハンマーだけ。アイテム選択は飛ばす
+    item = 'hammer'; world.equip('hammer');
+    setTarget('vase', false);
+    show('play');
+    if (!store.get('bunnage_tut_hammer')) $('#tutorial').hidden = false;
+    setTimeout(checkSensors, 1500);
+  } else show('item');
 }
+function setTarget(t, apply = true) {
+  document.querySelectorAll('#targetBar button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  if (apply) { world.setHammerTarget(t); haptics.tick(); }
+}
+document.querySelectorAll('#targetBar button').forEach(b => b.addEventListener('click', () => { if (!b.classList.contains('on')) setTarget(b.dataset.t); }));
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));
 $('#stageWarehouse').addEventListener('click', () => enterStage('warehouse'));
 $('#stageCar').addEventListener('click', () => enterStage('car'));
+$('#stageHammer').addEventListener('click', () => enterStage('hammer'));
 if (/[?&]car\b/.test(location.search)) $('#stageCar').hidden = false; // 隠しステージ
 
 document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {
@@ -77,6 +95,15 @@ function checkSensors() {
 // ---------------- 投擲 ----------------
 det.onRelease = (sw) => {
   if (!world.heldMesh) return;
+  if (world.heldKind === 'hammer') {
+    // 振動は当たった瞬間に出す
+    world.swingHammer(sw); sfx.whoosh(sw.power * 0.8);
+    lastThrow = sw;
+    lockUntil = performance.now() + 450;
+    document.body.classList.add('locked');
+    if (holdEnding) endHold();
+    return;
+  }
   haptics.release(sw.power);          // 最優先：手から離れた感覚
   world.throwHeld(sw);
   sfx.whoosh(sw.power);
@@ -92,7 +119,7 @@ function startHold() {
   document.body.classList.add('holding');
   world.setHold(true);
   haptics.hold(); sfx.grab();
-  if (!$('#tutorial').hidden) { $('#tutorial').hidden = true; store.set('bunnage_tut', '1'); }
+  if (!$('#tutorial').hidden) { $('#tutorial').hidden = true; store.set(world.stageType === 'hammer' ? 'bunnage_tut_hammer' : 'bunnage_tut', '1'); }
   if (world.handReady) det.arm();
 }
 function endHold() {
@@ -134,6 +161,12 @@ touch.addEventListener('pointermove', (e) => {
   if (ptr.kind === 'cam') {
     if (camLocked()) return;
     const L = world.viewLimits();
+    if (world.stageType === 'hammer') {
+      // 左右：対象のまわりを歩く。上下：見上げる／見下ろす
+      world.orbitA -= dx * 0.006;
+      world.pitch = clamp(world.pitch + dy * 0.0048, L.pitchMin, L.pitchMax);
+      return;
+    }
     [world.yaw, world.pitch] = world.clampView(
       clamp(world.yaw + dx * 0.0048, -L.yaw, L.yaw),
       clamp(world.pitch + dy * 0.0048, L.pitchMin, L.pitchMax));
@@ -209,7 +242,7 @@ $('#cCancel').addEventListener('click', () => { $('#confirm').hidden = true; });
 $('#cOk').addEventListener('click', () => {
   $('#confirm').hidden = true;
   const f = $('#fade'); f.classList.add('on');
-  setTimeout(() => { world.reset(); world.equip(item); setTimeout(() => f.classList.remove('on'), 120); }, 320);
+  setTimeout(() => { world.reset(); world.equip(item); if (world.stageType === 'hammer') setTarget('vase', false); setTimeout(() => f.classList.remove('on'), 120); }, 320);
 });
 $('#mStage').addEventListener('click', () => { $('#menu').hidden = true; endHold(); show('stage'); });
 

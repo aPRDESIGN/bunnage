@@ -2,14 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609300401';
-import { sfx } from './audio.js?v=202609300401';
-import { Car } from './car.js?v=202609300401';
-import { GiantVase } from './vase.js?v=202609300401';
-import { haptics } from './haptics.js?v=202609300401';
+import * as TX from './textures.js?v=202609300417';
+import { sfx } from './audio.js?v=202609300417';
+import { Car } from './car.js?v=202609300417';
+import { GiantVase } from './vase.js?v=202609300417';
+import { haptics } from './haptics.js?v=202609300417';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
 const D2R = Math.PI / 180;
 
 // 部屋の寸法（m）
@@ -91,6 +92,8 @@ export class World {
     this.heldKind = null; this.heldMesh = null; this.holding = false; this.handT = 0; this.refillAt = 0;
 
     this._lights();
+    // ハンマーのステージだけ使う、手元を照らす弱い明かり
+    this.headLamp = new THREE.PointLight('#fff1dc', 0, 3.2, 2); this.headLamp.position.set(0.25, 0.3, 0); this.camera.add(this.headLamp);
 
     this.physics = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
     this.physics.broadphase = new CANNON.SAPBroadphase(this.physics);
@@ -173,7 +176,10 @@ export class World {
     this.fridgeFront = null;
     this.vases = []; this.vaseSlots = [];
     this.car = null;
+    this.orbitA = 0; this.hammerAnim = null;
+    this.headLamp.intensity = this.stageType === 'hammer' ? 1.4 : 0;
     if (this.stageType === 'warehouse') this._warehouse();
+    else if (this.stageType === 'hammer') this._hammerRoom();
     else if (this.stageType === 'car') this._parking();
     else { this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items(); }
     this._setLightLevel(this.stageType === 'cg' || !this.stageType ? 1 : 0);
@@ -270,7 +276,34 @@ export class World {
   }
 
   // ================ 倉庫と巨大な壺 =================
-  _warehouse() {
+  // ハンマー：壺の間近に立つ。左右のスワイプで周りを歩く
+  _hammerRoom() {
+    this._warehouse([{ x: 0, opts: { style: 'sometsuke', finishHits: 3 } }]);
+    this.orbitC = new THREE.Vector3(0, 0, -2.3); this.orbitR = 2.2;
+    const top = new THREE.PointLight('#fff2dc', 7, 6, 2); top.position.set(-0.6, 3.4, -2.8); this.stage.add(top);
+    const back = new THREE.PointLight('#aebfd6', 4, 6, 2); back.position.set(0.8, 2.2, -4.6); this.stage.add(back);
+  }
+  // 叩く物を替える（今の物は崩して、次を上から落とす）
+  setHammerTarget(t) {
+    const slot = this.vaseSlots[0]; if (!slot) return;
+    slot.opts = t === 'stone' ? { style: 'stone', tough: true, finishHits: 8 } : { style: 'sometsuke', finishHits: 3 };
+    slot.target = t;
+    if (slot.pending) return;
+    if (slot.vase && !slot.vase.drop) slot.vase.collapseAll();
+    this._respawn(slot, 900);
+  }
+  _respawn(slot, delay) {
+    slot.pending = true;
+    const stageNow = this.stage;
+    setTimeout(() => {
+      if (this.stage !== stageNow) return;
+      if (slot.cycle && !slot.opts.tough) { const st = ['sometsuke', 'seiji', 'kuro']; slot.opts.style = st[(st.indexOf(slot.opts.style) + 1) % 3]; }
+      slot.vase = new GiantVase(this, slot.center, { ...slot.opts, drop: true });
+      this.vases.push(slot.vase); slot.pending = false;
+    }, delay);
+  }
+
+  _warehouse(slotDefs = [{ x: -1.9, opts: { style: 'seiji' } }, { x: 0, opts: { style: 'sometsuke' } }, { x: 1.9, opts: { style: 'kuro' } }]) {
     const X = 7, Z0 = -8, Z1 = 4, Hh = 6, W = X * 2, D = Z1 - Z0, T = 1.0;
     const floorMat = this.mat('#ffffff', 0.85, 0, { map: TX.concreteFloor(W / 2, D / 2) });
     this.box(W, 0.1, D, 0, -0.05, (Z0 + Z1) / 2, floorMat, { surface: 'floor', pd: [W + 2, T, D + 2], pp: [0, -T / 2, (Z0 + Z1) / 2] });
@@ -290,14 +323,14 @@ export class World {
     const wood = this.mat('#9c7a52', 0.8);
     const tape = this.mat('#ffffff', 0.7, 0, { map: TX.hazard() });
     this.vaseSlots = [];
-    [[-1.9, 'seiji'], [0, 'sometsuke'], [1.9, 'kuro']].forEach(([x, style], k) => {
+    slotDefs.forEach(({ x, opts }) => {
       const center = new THREE.Vector3(x, 0.14, -2.3);
       const spot = new THREE.SpotLight('#fff0d8', 55, 12, 0.33, 0.55, 2);
       spot.position.set(x + 0.4, 6.0, -0.9); spot.target.position.set(x, 1.0, -2.3);
-      if (k === 1) { spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024); spot.shadow.bias = -0.0006; spot.shadow.normalBias = 0.02; spot.angle = 0.62; spot.intensity = 70; spot.target.position.set(0, 0.8, -2.3); }
+      if (x === 0) { spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024); spot.shadow.bias = -0.0006; spot.shadow.normalBias = 0.02; spot.angle = 0.62; spot.intensity = 70; spot.target.position.set(0, 0.8, -2.3); }
       this.stage.add(spot, spot.target);
       this.box(1.3, 0.14, 1.3, center.x, 0.07, center.z, wood, { surface: 'wood' });
-      this.vaseSlots.push({ center, style, vase: null, pending: false });
+      this.vaseSlots.push({ center, opts: { ...opts }, vase: null, pending: false, cycle: slotDefs.length === 1 });
     });
     const fill = new THREE.PointLight('#8fa2bb', 5, 10, 2); fill.position.set(0, 3.2, 2.6); this.stage.add(fill);
     // 区画線
@@ -311,7 +344,7 @@ export class World {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.88, 24), this.mat(c, 0.5, 0.4)); m.position.set(x, 0.44, z); m.castShadow = m.receiveShadow = true; this.stage.add(m);
       const b = new CANNON.Body({ mass: 0 }); b.addShape(new CANNON.Cylinder(0.29, 0.29, 0.88, 12)); b.position.set(x, 0.44, z); b.ud = { static: true, surface: 'steel' }; this.physics.addBody(b);
     });
-    for (const slot of this.vaseSlots) { slot.vase = new GiantVase(this, slot.center, { style: slot.style }); this.vases.push(slot.vase); }
+    for (const slot of this.vaseSlots) { slot.vase = new GiantVase(this, slot.center, { ...slot.opts }); this.vases.push(slot.vase); }
   }
 
   _room() {
@@ -720,7 +753,8 @@ export class World {
     this._refill(0);
   }
   _refill(delay) { this.refillAt = this.clock + delay; }
-  _spawnHeld() {
+ _spawnHeld() {
+    if (this.heldKind === 'hammer') { const h = this.makeHammer(); this.heldMesh = h; this.hand.add(h); this.handT = 0; return; }
     const m = this.heldKind === 'glass' ? this.makeGlass() : this.heldKind === 'egg' ? this.makeEgg() : this.makeCan();
     m.castShadow = false;
     if (this.heldKind === 'can') m.rotation.z = 0.25;
@@ -728,7 +762,94 @@ export class World {
     this.heldMesh = m; this.hand.add(m); this.handT = 0;
   }
   setHold(on) { this.holding = on; }
-  get handReady() { return !!this.heldMesh && this.handT > 0.25; }
+  get handReady() { return !!this.heldMesh && this.handT > 0.25 && !this.hammerAnim; }
+
+  // ================ ハンマー =================
+  makeHammer() {
+    const g = new THREE.Group();
+    const wood = this.mat('#8a5e36', 0.6), grip = this.mat('#1c1c1c', 0.8), steel = this.mat('#8d9296', 0.3, 0.9);
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.017, 0.4, 12), wood); handle.position.y = 0.16; g.add(handle);
+    const rub = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.12, 12), grip); rub.position.y = 0.0; g.add(rub);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.15), steel); head.position.set(0, 0.35, -0.01); g.add(head);
+    const face = new THREE.Mesh(new THREE.CylinderGeometry(0.029, 0.029, 0.03, 16), steel); face.rotation.x = Math.PI / 2; face.position.set(0, 0.35, -0.095); g.add(face);
+    g.traverse(o => { o.castShadow = false; });
+    g.userData.pose = { x: 0.35, z: 0.3 };
+    g.rotation.set(0.35, 0, 0.3);
+    return g;
+  }
+
+  // 振り下ろす。当たるのは画面の真ん中の先
+  swingHammer(swing) {
+    if (!this.heldMesh || this.hammerAnim) return;
+    const v = 3 + 18 * clamp(swing.power - 0.5, 0, 0.5);
+    this.hammerAnim = { t: 0, v, struck: false, power: swing.power };
+  }
+
+  _strike(v) {
+    const cam = this.camera;
+    const look = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    this.stage.updateMatrixWorld(true);
+    const pieceOf = (o) => { for (let q = o; q; q = q.parent) for (const vs of this.vases) { const i = vs.pieces.findIndex(p => p.mesh === q && p.attached); if (i >= 0) return [vs, i]; } return null; };
+    // 飛んでいる破片や外れたかけらは素通りして、その奥の本体を叩く
+    const moving = new Set(this.dyn.map(r => r.mesh));
+    for (const sb of this.shards) if (sb.ud && sb.ud.mesh) moving.add(sb.ud.mesh);
+    const isMoving = (o) => { for (let q = o; q; q = q.parent) if (moving.has(q)) return true; return false; };
+    const rc = new THREE.Raycaster(); rc.near = 0.1; rc.far = 2.5;
+    const cast = (dir) => {
+      rc.set(cam.position, dir);
+      for (const h of rc.intersectObjects(this.stage.children, true)) {
+        if (!h.object.isMesh) continue;
+        const pc = pieceOf(h.object);
+        if (pc) return { pc, h };
+        if (isMoving(h.object)) continue;
+        if (h.object.material && h.object.material.depthWrite === false) continue; // 跡やしぶきは素通り
+        return { h };
+      }
+      return null;
+    };
+    // 真ん中が穴を抜けたときは、すぐ周りの縁を叩く
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion), up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+    let res = cast(look);
+    if (!res || !res.pc) {
+      search: for (const a of [0.05, 0.1, 0.16, 0.23, 0.31, 0.4]) for (let k = 0; k < 10; k++) {
+        const t = k / 10 * Math.PI * 2 + a * 7;
+        const d = look.clone().addScaledVector(right, Math.cos(t) * a).addScaledVector(up, Math.sin(t) * a).normalize();
+        const r2 = cast(d); if (r2 && r2.pc) { res = r2; break search; }
+      }
+    }
+    if (!res) return false;
+    const h = res.h;
+    haptics.hit(clamp(v / 10, 0.4, 1));
+    if (res.pc) {
+      const [vs, i] = res.pc;
+      if (!vs.drop) vs.hit(i, h.point, v, 1.2, look, 'hammer');
+      return true;
+    }
+    const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : look.clone().negate();
+    if (n.dot(look) > 0) n.negate();
+    const surface = h.point.y < 0.02 ? 'floor' : h.point.y < 0.16 && Math.abs(h.point.z + 2.3) < 0.7 ? 'wood' : 'wall';
+    this._scuff(h.point, n, { ud: { static: true, surface } }, Math.max(2.6, v), 1.2);
+    sfx.knock(Math.max(3, v * 0.7), surface === 'wood' ? 0.8 : 0.5);
+    return true;
+  }
+
+  _updateHammer(dt) {
+    const h = this.heldMesh, a = this.hammerAnim;
+    if (!h || this.heldKind !== 'hammer') return;
+    const P = h.userData.pose;
+    let rx = P.x, rz = P.z, px = 0, py = 0, pz = 0;
+    if (a) {
+      a.t += dt;
+      const T1 = 0.13, T2 = 0.2, T3 = 0.52;
+      if (a.t < T1) { const k = a.t / T1, e = k * k; rx = lerp(P.x, -1.25, e); rz = lerp(P.z, 0.55, e); px = -0.07 * e; pz = -0.06 * e; py = 0.06 * e; }
+      else if (a.t < T2) { rx = -1.25; rz = 0.55; px = -0.07; pz = -0.06; py = 0.06; }
+      else { const k = Math.min(1, (a.t - T2) / (T3 - T2)), e = 1 - Math.pow(1 - k, 3); rx = lerp(-1.25, P.x, e); rz = lerp(0.55, P.z, e); px = -0.07 * (1 - e); pz = -0.06 * (1 - e); py = 0.06 * (1 - e); }
+      if (!a.struck && a.t >= T1 * 0.85) { a.struck = true; if (!this._strike(a.v)) sfx.whoosh(0.3); }
+      if (a.t >= T3) this.hammerAnim = null;
+    }
+    h.rotation.set(rx, 0, rz);
+    h.position.set(px, py, pz);
+  }
 
   // 投げる。yaw:右が正、pitch:上が正（振りの成分）
   throwHeld(swing) {
@@ -1211,13 +1332,7 @@ export class World {
       const cur = slot.vase;
       if (cur && cur.done && !cur.drop && !slot.pending && this.clock - cur.lastHit > 1.2) {
         cur.collapseAll();
-        slot.pending = true;
-        const stageNow = this.stage;
-        setTimeout(() => {
-          if (this.stage !== stageNow) return;
-          slot.vase = new GiantVase(this, slot.center, { drop: true, style: slot.style });
-          this.vases.push(slot.vase); slot.pending = false;
-        }, 1600);
+        this._respawn(slot, 1600);
       }
     }
     this.vases = this.vases.filter(v => (this.vaseSlots || []).some(s => s.vase === v) || v.pieces.some(p => p.dyn));
@@ -1253,10 +1368,19 @@ export class World {
       this.handT += dt;
       const k = Math.min(1, this.handT / 0.25), e = 1 - Math.pow(1 - k, 3);
       const grip = this.holding ? 1 : 0;
-      this.hand.position.set(this.handBase.x - grip * 0.02, this.handBase.y - (1 - e) * 0.2 + grip * 0.03 + Math.sin(this.clock * 1.6) * 0.003, this.handBase.z + grip * 0.03);
+      const hb = this.heldKind === 'hammer' ? this._hammerBase || (this._hammerBase = new THREE.Vector3(0.2, -0.36, -0.52)) : this.handBase;
+      this.hand.position.set(hb.x - grip * 0.02, hb.y - (1 - e) * 0.2 + grip * 0.03 + Math.sin(this.clock * 1.6) * 0.003, hb.z + grip * 0.03);
+      this._updateHammer(dt);
     }
 
-    this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    if (this.stageType === 'hammer' && this.orbitC) {
+      const c = this.orbitC, r = this.orbitR;
+      this.camera.position.set(c.x + Math.sin(this.orbitA) * r, EYE.y, c.z + Math.cos(this.orbitA) * r);
+      this.camera.rotation.set(this.pitch, this.orbitA + this.yaw, 0, 'YXZ');
+    } else {
+      this.camera.position.copy(EYE);
+      this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+    }
     this.renderer.render(this.scene, this.camera);
   }
 }
