@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609301419';
-import { sfx } from './audio.js?v=202609301419';
-import { Car } from './car.js?v=202609301419';
-import { PlateStack } from './plates.js?v=202609301419';
-import { Monitor } from './monitor.js?v=202609301419';
-import { Pane, Fixture, Swinger } from './props.js?v=202609301419';
-import { ScrapCar } from './scrapcar.js?v=202609301419';
-import { GiantVase } from './vase.js?v=202609301419';
-import { haptics } from './haptics.js?v=202609301419';
+import * as TX from './textures.js?v=202609301422';
+import { sfx } from './audio.js?v=202609301422';
+import { Car } from './car.js?v=202609301422';
+import { PlateStack } from './plates.js?v=202609301422';
+import { Monitor } from './monitor.js?v=202609301422';
+import { Pane, Fixture, Swinger } from './props.js?v=202609301422';
+import { ScrapCar } from './scrapcar.js?v=202609301422';
+import { GiantVase } from './vase.js?v=202609301422';
+import { haptics } from './haptics.js?v=202609301422';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1462,7 +1462,7 @@ export class World {
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.033, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), wood); cap.scale.y = 0.4; cap.position.y = 0.68; g.add(cap);
     const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.0155, 0.0155, 0.18, 12), tape); grip.position.y = 0.0; g.add(grip);
     const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.02, 0.02, 14), wood); knob.position.y = -0.1; g.add(knob);
-    g.userData.pose = { x: 0.2, z: 0.55 }; g.rotation.set(0.2, 0, 0.55);
+    g.userData.pose = { x: -0.6, z: 0.1 }; g.rotation.set(-0.6, 0, 0.1); // 少し前に倒して構える
     return g;
   }
   makePan() {
@@ -1551,8 +1551,8 @@ export class World {
     if (a) {
       a.t += dt;
       const T1 = 0.13, T2 = 0.2, T3 = 0.52;
-      // バットは右肩から左へ横にふり抜く。ほかは振り下ろす
-      const EX = bat ? -1.0 : -1.25, EZ = bat ? 1.55 : 0.55, EPX = bat ? -0.16 : -0.07;
+      // どの道具も、前へ振り下ろす（バットは長いので少し深く）
+      const EX = bat ? -1.45 : -1.25, EZ = bat ? 0.3 : 0.55, EPX = bat ? -0.1 : -0.07;
       if (a.t < T1) { const k = a.t / T1, e = k * k; rx = lerp(P.x, EX, e); rz = lerp(P.z, EZ, e); px = EPX * e; pz = -0.06 * e; py = 0.06 * e; }
       else if (a.t < T2) { rx = EX; rz = EZ; px = EPX; pz = -0.06; py = 0.06; }
       else { const k = Math.min(1, (a.t - T2) / (T3 - T2)), e = 1 - Math.pow(1 - k, 3); rx = lerp(EX, P.x, e); rz = lerp(EZ, P.z, e); px = EPX * (1 - e); pz = -0.06 * (1 - e); py = 0.06 * (1 - e); }
