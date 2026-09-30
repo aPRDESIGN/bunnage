@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300508';
-import { SwingDetector } from './motion.js?v=202609300508';
-import { sfx } from './audio.js?v=202609300508';
-import { haptics, hapticSettings } from './haptics.js?v=202609300508';
+import { World } from './world.js?v=202609300517';
+import { SwingDetector } from './motion.js?v=202609300517';
+import { sfx } from './audio.js?v=202609300517';
+import { haptics, hapticSettings } from './haptics.js?v=202609300517';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -226,7 +226,7 @@ $('#carousel').addEventListener('click', (e) => { if (e.target === $('#carousel'
 $('#menuBtn').addEventListener('click', () => {
   if (holding) return;
   const k = haptics.kind;
-  $('#hapNote').textContent = k === 'native' ? '振動：アプリ（Core Haptics）' : k === 'vibrate' ? '振動：ブラウザの振動機能' : 'この環境では振動は出ません（iPhoneのブラウザなど）。アプリ版で動きます。';
+  $('#hapNote').textContent = k === 'native' ? '振動：アプリ（Core Haptics）' : k === 'vibrate' ? '振動：ブラウザの振動機能' : k === 'ios-switch' ? '振動：iPhoneのブラウザ用の裏技（軽いコツッだけ・iOS 18以降）。しっかり振動させるならアプリ版で。' : 'この環境では振動は出ません（iPhoneのブラウザなど）。アプリ版で動きます。';
   $('#menu').hidden = false;
 });
 $('#mClose').addEventListener('click', () => { $('#menu').hidden = true; });

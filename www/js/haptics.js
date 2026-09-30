@@ -2,7 +2,7 @@
 // iPhoneアプリ（Capacitor）では @capacitor/haptics（Core Haptics）を使う。
 // ブラウザでは navigator.vibrate（Androidのみ）。iPhoneのSafariでは何も起きない。
 
-export const hapticSettings = { hit: true, break: true };
+export const hapticSettings = { hit: true, break: true, iosSwitch: true };
 
 function plugin() {
   const cap = window.Capacitor;
@@ -12,12 +12,38 @@ function plugin() {
   return null;
 }
 
+// iPhoneのブラウザ用の裏技：iOS 18以降のSafariは、スイッチ型のチェックボックスを切り替えると
+// 「コツッ」と軽く振動する。見えないスイッチを押して、その振動を借りる（強さ・長さは選べない）
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let sw = null;
+function iosTick() {
+  try {
+    if (!sw) {
+      sw = document.createElement('label'); sw.setAttribute('aria-hidden', 'true');
+      sw.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+      const i = document.createElement('input'); i.type = 'checkbox'; i.setAttribute('switch', ''); i.tabIndex = -1;
+      sw.appendChild(i); document.body.appendChild(sw);
+    }
+    sw.click();
+  } catch (e) { /* 無視 */ }
+}
+// パターン（ms）の「鳴らす」部分の数だけコツッを刻む
+function iosPattern(pattern) {
+  const p = Array.isArray(pattern) ? pattern : [pattern];
+  let t = 0;
+  for (let k = 0; k < p.length; k += 2) { if (t === 0) iosTick(); else setTimeout(iosTick, t); t += p[k] + (p[k + 1] || 0) + 40; }
+}
+const canVibrate = typeof navigator.vibrate === 'function';
+
 function vib(pattern) {
-  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* 無視 */ }
+  try {
+    if (canVibrate) navigator.vibrate(pattern);
+    else if (isIOS && hapticSettings.iosSwitch) iosPattern(pattern);
+  } catch (e) { /* 無視 */ }
 }
 
 export const haptics = {
-  get kind() { return plugin() ? 'native' : (navigator.vibrate ? 'vibrate' : 'none'); },
+  get kind() { return plugin() ? 'native' : canVibrate ? 'vibrate' : isIOS ? 'ios-switch' : 'none'; },
 
   // HOLD成立：物を掴んだ感覚。軽く短く
   hold() {
