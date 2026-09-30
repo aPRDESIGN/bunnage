@@ -3,7 +3,8 @@
 スマホを握ったまま腕を振ると、ゲーム内の物が飛んでいって壊れる、体感型のストレス発散ゲーム。
 コンセプトは「投げて、壊して、片付けない。」
 
-- Demo：https://aprdesign.github.io/bunnage/ （`www/` が本体）
+- 公開先：https://apr-design.com/game/ （`www/` の中身をアップ）
+- GitHub Pages（aprdesign.github.io/bunnage）は公開先へ転送するだけ
 - 最初の試作（2D）：`prototype-v0/`
 
 ## 構成
@@ -26,7 +27,7 @@
 
 ## 実機テスト（ブラウザ版）
 
-1. iPhoneのSafariで https://aprdesign.github.io/bunnage/ を開く
+1. iPhoneのSafariで https://apr-design.com/game/ を開く
 2. 「キッチン」→ センサーの許可を「許可」→ 投げるものを選ぶ
 3. 画面の真ん中あたりを押さえたまま、スマホを握って振る
 
