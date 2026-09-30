@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300857';
-import { SwingDetector } from './motion.js?v=202609300857';
-import { sfx } from './audio.js?v=202609300857';
-import { haptics, hapticSettings } from './haptics.js?v=202609300857';
+import { World } from './world.js?v=202609300904';
+import { SwingDetector } from './motion.js?v=202609300904';
+import { sfx } from './audio.js?v=202609300904';
+import { haptics, hapticSettings } from './haptics.js?v=202609300904';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
