@@ -361,3 +361,17 @@ export const hazard = () => make('hazard', 256, 32, (g, w, h) => {
   g.fillStyle = '#1b1b1b'; for (let x = -h; x < w + h; x += h * 1.4) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + h * .7, h); g.lineTo(x + h * 1.4, 0); g.lineTo(x + h * .7, 0); g.closePath(); g.fill(); }
   noise(g, w, h, 900, .25);
 }, { repeat: [6, 1] });
+
+// ナンバープレート（架空）
+export const plate = () => make('plate', 256, 128, (g, w, h) => {
+  g.fillStyle = '#f4f4ee'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#2f6b3a'; g.lineWidth = 6; g.strokeRect(4, 4, w - 8, h - 8);
+  g.fillStyle = '#2f6b3a'; g.textAlign = 'center';
+  g.font = 'bold 24px sans-serif'; g.fillText('なにわ 500', w / 2, 38);
+  g.font = 'bold 56px sans-serif'; g.fillText('ぶ 12-34', w / 2, 104);
+});
+// 駐車場の床（コンクリート＋白線は別）
+export const parkingSign = () => make('psign', 128, 128, (g, w, h) => {
+  g.fillStyle = '#1f4fa3'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#fff'; g.font = 'bold 96px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('P', w / 2, h / 2 + 6);
+});

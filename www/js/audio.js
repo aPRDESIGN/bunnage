@@ -147,6 +147,31 @@ class Sfx {
     this.tone(t, 260 * pitch, 110 * pitch, 0.09, 'triangle', g);
     this.nz(t, 0.06, 'bandpass', 900 * pitch, 1.5, g * 0.8);
   }
+
+  // 車の防犯アラーム（ピーポー）。止める関数を返す
+  alarm(dur = 8) {
+    if (!this.ac) return () => {};
+    const ac = this.ac, t0 = ac.currentTime;
+    const o = ac.createOscillator(); o.type = 'square';
+    const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1500; f.Q.value = 0.7;
+    const g = ac.createGain(); g.gain.value = 0.0001;
+    for (let t = 0; t < dur; t += 0.6) {
+      o.frequency.setValueAtTime(900, t0 + t); o.frequency.setValueAtTime(1250, t0 + t + 0.3);
+    }
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.07, t0 + 0.05);
+    g.gain.setValueAtTime(0.07, t0 + dur - 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(f); f.connect(g); g.connect(this.out); o.start(t0); o.stop(t0 + dur + 0.05);
+    return () => { try { g.gain.cancelScheduledValues(ac.currentTime); g.gain.setValueAtTime(0.0001, ac.currentTime); o.stop(ac.currentTime + 0.02); } catch (e) { /* 無視 */ } };
+  }
+
+  // ボディが凹む「ボコッ」
+  thunk(v) {
+    if (!this.ac || !this.throttle('thunk', 0.05)) return; const t = this.t;
+    const g = Math.min(0.7, 0.15 + v * 0.06);
+    this.tone(t, 95, 55, 0.3, 'sine', g); this.tone(t, 240, 170, 0.18, 'triangle', g * 0.45);
+    this.nz(t, 0.12, 'lowpass', 900, 0.8, g * 0.6);
+    [620, 1130, 1760].forEach((f, i) => this.tone(t, f, f * 0.98, 0.25 / (1 + i), 'sine', g * 0.12));
+  }
 }
 
 export const sfx = new Sfx();
