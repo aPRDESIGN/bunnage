@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300904';
-import { SwingDetector } from './motion.js?v=202609300904';
-import { sfx } from './audio.js?v=202609300904';
-import { haptics, hapticSettings } from './haptics.js?v=202609300904';
+import { World } from './world.js?v=202609300913';
+import { SwingDetector } from './motion.js?v=202609300913';
+import { sfx } from './audio.js?v=202609300913';
+import { haptics, hapticSettings } from './haptics.js?v=202609300913';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -108,7 +108,7 @@ function shatterTitle(ev) {
 $('#titleScreen').addEventListener('click', shatterTitle);
 // メニューのボタンはピッと鳴って一瞬光る
 document.addEventListener('click', (e) => {
-  const b = e.target.closest('.screen.arcade button');
+  const b = e.target.closest('.screen.arcade button, .arcade-sheet button');
   if (!b) return;
   sfx.unlock(); sfx.blip();
   b.classList.add('hit'); setTimeout(() => b.classList.remove('hit'), 180);
@@ -123,7 +123,7 @@ async function enterStage(type, hammerKind) {
   world.reset(type);
   world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.24 : type === 'hammer' ? world.hammerPitch : -0.12;
   const hammer = type === 'hammer';
-  $('#itemBtn').hidden = hammer; $('#walkHint').hidden = !hammer;
+  $('#wheel').hidden = hammer; $('#walkHint').hidden = !hammer;
   $('#tutorial').innerHTML = hammer ? TUT_HAMMER : TUT_THROW;
   if (hammer) {
     // 手に持つのはハンマーだけ。アイテム選択は飛ばす
@@ -145,7 +145,7 @@ if (/[?&]car\b/.test(location.search)) $('#stageCar').hidden = false; // 隠し�
 
 document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {
   sfx.unlock();
-  setItem(b.dataset.kind, false);
+  setItem(b.dataset.kind, false); wShow(b.dataset.kind);
   show('play');
   if (!store.get('bunnage_tut')) $('#tutorial').hidden = false;
   setTimeout(checkSensors, 1500);
@@ -155,7 +155,6 @@ function setItem(kind, tick = true) {
   if (item === kind && world.heldKind === kind) return;
   item = kind;
   world.equip(kind);
-  $('#itemBtn use').setAttribute('href', '#i-' + kind);
   $('#itemName').textContent = NAMES[kind];
   if (tick) haptics.tick();
 }
@@ -213,7 +212,7 @@ const HOLD_DELAY = 130, MOVE_TOL = 12;
 
 function inHoldZone(x, y) {
   const w = window.innerWidth, h = window.innerHeight;
-  return x > w * 0.12 && x < w * 0.88 && y > h * 0.2 && y < h - 110;
+  return x > w * 0.12 && x < w * 0.88 && y > h * 0.2 && y < h - 175;
 }
 function camLocked() { return holding || performance.now() < lockUntil; }
 
@@ -277,42 +276,80 @@ touch.addEventListener('pointercancel', pointerEnd);
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ---------------- アイテムのダイヤル ----------------
-const dial = $('#dial');
-const dialItems = [...dial.querySelectorAll('.dial-item')];
-$('#itemBtn').addEventListener('click', () => {
-  if (holding) return;
-  $('#carousel').hidden = false;
-  const el = dialItems.find(d => d.dataset.kind === item);
-  dial.scrollLeft = el.offsetLeft - (dial.clientWidth - el.clientWidth) / 2;
-  markDial();
-});
-function markDial() {
-  const mid = dial.scrollLeft + dial.clientWidth / 2;
-  let best = null, bd = 1e9;
-  for (const d of dialItems) { const c = d.offsetLeft + d.clientWidth / 2, dd = Math.abs(c - mid); if (dd < bd) { bd = dd; best = d; } }
-  dialItems.forEach(d => d.classList.toggle('on', d === best));
-  if (best && best.dataset.kind !== item) setItem(best.dataset.kind);
+// 回すダイヤル：下から半分のぞく円盤に投げる物が並ぶ。指で円をなぞるように回すと、慣性でくるくる回って一番上の物で止まる
+const WHEEL = { slots: ['glass', 'egg', 'can', 'glass', 'egg', 'can'], step: 60, R: 104, cx: 170, cy: 188 };
+const wheelEl = $('#wheel'), wheelDisc = $('#wheelDisc'), wheelItems = $('#wheelItems');
+let wAngle = 0, wVel = 0, wDrag = null, wAnim = false, wLastIdx = 0;
+const wEls = WHEEL.slots.map(k => { const d = document.createElement('div'); d.className = 'w-item'; d.innerHTML = `<svg><use href="#i-${k}"/></svg>`; wheelItems.appendChild(d); return d; });
+function wIndex(a) { const n = WHEEL.slots.length; return ((Math.round(-a / WHEEL.step) % n) + n) % n; }
+function wRender() {
+  wheelDisc.style.transform = `rotate(${wAngle}deg)`;
+  const idx = wIndex(wAngle);
+  wEls.forEach((el, k) => {
+    const th = (k * WHEEL.step + wAngle) * D2R;
+    const x = Math.sin(th) * WHEEL.R, y = -Math.cos(th) * WHEEL.R;
+    const near = Math.max(0, Math.cos(th));
+    el.style.transform = `translate(${x}px,${y}px) scale(${0.62 + 0.5 * Math.pow(near, 3)})`;
+    el.style.opacity = (0.25 + 0.75 * Math.pow(near, 4)).toFixed(2);
+    el.classList.toggle('on', k === idx);
+  });
+  if (idx !== wLastIdx) { wLastIdx = idx; sfx.tick ? sfx.tick() : sfx.blip(); $('#itemName').textContent = NAMES[WHEEL.slots[idx]]; }
 }
-dial.addEventListener('scroll', markDial, { passive: true });
-dialItems.forEach(d => d.addEventListener('click', (e) => {
-  e.stopPropagation();
-  if (d.classList.contains('on')) { $('#carousel').hidden = true; return; }
-  dial.scrollTo({ left: d.offsetLeft - (dial.clientWidth - d.clientWidth) / 2, behavior: 'smooth' });
-}));
-$('#carousel').addEventListener('click', (e) => { if (e.target === $('#carousel')) $('#carousel').hidden = true; });
+function wAngleAt(e) { const r = wheelEl.getBoundingClientRect(); return Math.atan2(e.clientX - (r.left + WHEEL.cx), -(e.clientY - (r.top + WHEEL.cy))) / D2R; }
+wheelEl.addEventListener('pointerdown', (e) => {
+  if (holding) return;
+  sfx.unlock();
+  try { wheelEl.setPointerCapture(e.pointerId); } catch (_) { /* 無視 */ }
+  wDrag = { id: e.pointerId, a: wAngleAt(e), t: performance.now(), x: e.clientX, y: e.clientY, moved: 0 };
+  wVel = 0; wAnim = false;
+});
+wheelEl.addEventListener('pointermove', (e) => {
+  if (!wDrag || e.pointerId !== wDrag.id) return;
+  const a = wAngleAt(e), now = performance.now();
+  let d = a - wDrag.a; if (d > 180) d -= 360; if (d < -180) d += 360;
+  wAngle += d; wDrag.moved += Math.abs(d);
+  const dt = Math.max(8, now - wDrag.t); wVel = wVel * 0.5 + (d / dt * 16) * 0.5;
+  wDrag.a = a; wDrag.t = now;
+  wRender();
+});
+function wEnd(e) {
+  if (!wDrag || e.pointerId !== wDrag.id) return;
+  const tap = wDrag.moved < 3;
+  wDrag = null;
+  if (tap) {
+    // 横の物をタップしたら、そこまで回す
+    const r = wheelEl.getBoundingClientRect(), x = e.clientX - (r.left + WHEEL.cx);
+    if (Math.abs(x) > 45) { wSnapTo(Math.round(wAngle / WHEEL.step) * WHEEL.step - Math.sign(x) * WHEEL.step); return; }
+  }
+  wAnim = true; requestAnimationFrame(wSpin);
+}
+wheelEl.addEventListener('pointerup', wEnd); wheelEl.addEventListener('pointercancel', wEnd);
+function wSpin() {
+  if (!wAnim) return;
+  wAngle += wVel; wVel *= 0.93;
+  if (Math.abs(wVel) < 0.6) { wSnapTo(Math.round(wAngle / WHEEL.step) * WHEEL.step); return; }
+  wRender(); requestAnimationFrame(wSpin);
+}
+function wSnapTo(target) {
+  wAnim = true; const from = wAngle, t0 = performance.now();
+  const go = (now) => {
+    if (!wAnim) return;
+    const k = Math.min(1, (now - t0) / 220), e2 = 1 - Math.pow(1 - k, 3);
+    wAngle = from + (target - from) * e2; wRender();
+    if (k < 1) requestAnimationFrame(go); else { wAnim = false; setItem(WHEEL.slots[wIndex(wAngle)]); }
+  };
+  requestAnimationFrame(go);
+}
+function wShow(kind) { const k = WHEEL.slots.indexOf(kind); wAngle = -k * WHEEL.step; wLastIdx = wIndex(wAngle); wRender(); $('#itemName').textContent = NAMES[kind]; }
 
 // ---------------- メニュー ----------------
 $('#menuBtn').addEventListener('click', () => {
   if (holding) return;
-  const k = haptics.kind;
-  $('#hapNote').textContent = k === 'native' ? '振動：アプリ（Core Haptics）' : k === 'vibrate' ? '振動：ブラウザの振動機能' :  'この環境では振動は出ません（iPhoneのブラウザなど）。アプリ版で動きます。';
   $('#menu').hidden = false;
 });
 $('#mClose').addEventListener('click', () => { $('#menu').hidden = true; });
 $('#menu').addEventListener('click', (e) => { if (e.target === $('#menu')) $('#menu').hidden = true; });
 function sw(el, on) { el.setAttribute('aria-checked', on ? 'true' : 'false'); }
-$('#mHit').addEventListener('click', () => { hapticSettings.hit = !hapticSettings.hit; sw($('#mHit'), hapticSettings.hit); });
-$('#mBreak').addEventListener('click', () => { hapticSettings.break = !hapticSettings.break; sw($('#mBreak'), hapticSettings.break); });
 $('#mDebug').addEventListener('click', () => { debugOn = !debugOn; sw($('#mDebug'), debugOn); $('#debug').hidden = !debugOn; });
 $('#mClean').addEventListener('click', () => { $('#menu').hidden = true; $('#confirm').hidden = false; });
 $('#cCancel').addEventListener('click', () => { $('#confirm').hidden = true; });

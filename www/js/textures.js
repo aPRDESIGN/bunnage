@@ -209,25 +209,73 @@ function crack(g, cx, cy, n, len, color, width = 1.2) {
     g.stroke();
   }
 }
-export const scuff = (kind, i) => make('scuff_' + kind + i, 128, 128, (g, w, h) => {
+// 本物っぽいひび：枝分かれしながら細くなる線。暗い線の脇に明るい縁を添えて、割れ目の段差に見せる
+function fracture(g, x, y, a, len, w, depth, dark, light, bend = 0.2, branch = 0.12, pts = null) {
+  const steps = Math.max(3, Math.floor(len / 9));
+  let px = x, py = y;
+  g.lineCap = 'butt'; g.lineJoin = 'miter';
+  for (let s = 0; s < steps; s++) {
+    a += (rnd() - 0.5) * bend;
+    const nx = px + Math.cos(a) * len / steps, ny = py + Math.sin(a) * len / steps;
+    const ww = Math.max(0.4, w * (1 - s / steps * 0.7));
+    g.strokeStyle = light; g.lineWidth = ww * 0.8; g.beginPath(); g.moveTo(px + 0.7, py + 0.7); g.lineTo(nx + 0.7, ny + 0.7); g.stroke();
+    g.strokeStyle = dark; g.lineWidth = ww; g.beginPath(); g.moveTo(px, py); g.lineTo(nx, ny); g.stroke();
+    if (pts) pts.push([nx, ny, s / steps]);
+    if (depth > 0 && rnd() < branch) fracture(g, nx, ny, a + (rnd() < 0.5 ? -1 : 1) * (0.3 + rnd() * 0.4), len * (0.2 + rnd() * 0.3) * (1 - s / steps), ww * 0.7, depth - 1, dark, light, bend, branch * 0.5);
+    px = nx; py = ny;
+  }
+}
+// ぎざぎざの多角形
+function jag(g, cx, cy, r, n, k) { g.beginPath(); for (let a = 0; a < n; a++) { const ang = a / n * 6.283 + rnd() * .3, rr = r * (1 - k + rnd() * k * 2); a ? g.lineTo(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr) : g.moveTo(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr); } g.closePath(); }
+
+export const scuff = (kind, i) => make('scuff2_' + kind + i, (kind === 'tile' || kind === 'wall') ? 256 : 128, (kind === 'tile' || kind === 'wall') ? 256 : 128, (g, w, h) => {
   g.clearRect(0, 0, w, h);
   const cx = w / 2 + (rnd() - .5) * 8, cy = h / 2 + (rnd() - .5) * 8;
   if (kind === 'wall') {
-    // 壁紙のへこみと破れ
-    const rg = g.createRadialGradient(cx, cy, 2, cx, cy, 34);
-    rg.addColorStop(0, 'rgba(70,60,50,.55)'); rg.addColorStop(.5, 'rgba(90,80,70,.25)'); rg.addColorStop(1, 'rgba(90,80,70,0)');
-    g.fillStyle = rg; g.beginPath(); g.ellipse(cx, cy, 34, 26, rnd() * 3, 0, 7); g.fill();
-    g.fillStyle = 'rgba(40,34,28,.5)'; g.beginPath(); g.ellipse(cx, cy, 9 + rnd() * 5, 6 + rnd() * 4, rnd() * 3, 0, 7); g.fill();
-    g.fillStyle = 'rgba(255,252,245,.85)';
-    for (let k = 0; k < 3; k++) { g.beginPath(); const a = rnd() * 6.28; g.moveTo(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8); g.lineTo(cx + Math.cos(a + .4) * 20, cy + Math.sin(a + .4) * 20); g.lineTo(cx + Math.cos(a + .7) * 10, cy + Math.sin(a + .7) * 10); g.fill(); }
-    crack(g, cx, cy, 4, 34, 'rgba(60,52,44,.55)');
+    // 壁のへこみ：左上が明るく右下が暗い（くぼみの陰影）。破れた壁紙の下に石膏がのぞく
+    const R = 30 + rnd() * 10;
+    let rg = g.createRadialGradient(cx + 6, cy + 6, 2, cx, cy, R * 1.6);
+    rg.addColorStop(0, 'rgba(60,52,44,.42)'); rg.addColorStop(.6, 'rgba(80,70,60,.16)'); rg.addColorStop(1, 'rgba(80,70,60,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, w, h);
+    rg = g.createRadialGradient(cx - 8, cy - 8, 2, cx - 8, cy - 8, R);
+    rg.addColorStop(0, 'rgba(255,255,255,.28)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, w, h);
+    // 破れ目
+    g.fillStyle = 'rgba(214,205,188,.97)'; jag(g, cx, cy, 11 + rnd() * 6, 16, .35); g.fill();
+    g.strokeStyle = 'rgba(70,60,50,.6)'; g.lineWidth = 1.2; g.stroke();
+    g.fillStyle = 'rgba(120,108,92,.5)'; jag(g, cx + 2, cy + 2, 5 + rnd() * 3, 10, .3); g.fill();
+    // めくれた壁紙の小片
+    for (let k = 0; k < 4; k++) {
+      const a = rnd() * 6.283, r0 = 12 + rnd() * 6;
+      g.fillStyle = 'rgba(250,247,240,.95)'; g.beginPath(); g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      g.lineTo(cx + Math.cos(a + .25) * (r0 + 7 + rnd() * 6), cy + Math.sin(a + .25) * (r0 + 7 + rnd() * 6)); g.lineTo(cx + Math.cos(a + .45) * r0, cy + Math.sin(a + .45) * r0); g.fill();
+      g.strokeStyle = 'rgba(90,80,70,.35)'; g.lineWidth = .8; g.stroke();
+    }
+    for (let k = 0; k < 5; k++) fracture(g, cx, cy, rnd() * 6.283, 26 + rnd() * 40, 1.1, 1, 'rgba(70,60,50,.55)', 'rgba(255,255,255,.35)', 0.5, 0.18);
+    for (let k = 0; k < 160; k++) { const a = rnd() * 6.283, r = 10 + rnd() * rnd() * 50; g.fillStyle = `rgba(240,235,225,${.3 + rnd() * .4})`; g.fillRect(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 1 + rnd(), 1 + rnd()); }
   } else if (kind === 'tile') {
-    // タイルのひび
-    g.fillStyle = 'rgba(60,62,64,.6)'; g.beginPath();
-    for (let a = 0; a < 7; a++) { const ang = a / 7 * 6.28, r = 5 + rnd() * 6; a ? g.lineTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r) : g.moveTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r); }
-    g.closePath(); g.fill();
-    crack(g, cx, cy, 6, 60, 'rgba(50,52,55,.75)', 1.1);
-    crack(g, cx, cy, 5, 30, 'rgba(255,255,255,.6)', .8);
+    // タイルの割れ：中心で釉薬が欠けて素地が見え、そこから細いひびが枝分かれして走る
+    const R = 7 + rnd() * 5;
+    // 欠けた部分（明るい素地）と、その縁の陰
+    g.fillStyle = 'rgba(60,58,55,.35)'; jag(g, cx + 1.5, cy + 1.5, R + 2, 11, .35); g.fill();
+    g.fillStyle = 'rgba(214,208,196,.97)'; jag(g, cx, cy, R, 11, .35); g.fill();
+    g.strokeStyle = 'rgba(50,48,45,.55)'; g.lineWidth = .9; g.stroke();
+    const rg = g.createRadialGradient(cx - 2, cy - 2, 1, cx, cy, R); rg.addColorStop(0, 'rgba(170,164,152,.8)'); rg.addColorStop(1, 'rgba(170,164,152,0)'); g.fillStyle = rg; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
+    // まわりの小さな欠け
+    for (let k = 0; k < 4; k++) { const a = rnd() * 6.283, r = R + 3 + rnd() * 8; g.fillStyle = 'rgba(214,208,196,.9)'; jag(g, cx + Math.cos(a) * r, cy + Math.sin(a) * r, 1.5 + rnd() * 2.5, 6, .4); g.fill(); }
+    // 同心円状の割れ（途切れ途切れ）
+    g.strokeStyle = 'rgba(45,44,42,.55)'; g.lineWidth = .8;
+    for (const rr of [R + 8 + rnd() * 4, R + 18 + rnd() * 8]) { let a = rnd() * 6.283; for (let k = 0; k < 4; k++) { const len = .3 + rnd() * .6; g.beginPath(); g.arc(cx, cy, rr + (rnd() - .5) * 3, a, a + len); g.stroke(); a += len + .3 + rnd() * .8; } }
+    // 放射状のひび
+    // 放射状のひび（ほぼまっすぐ、ところどころで折れる）と、それをつなぐ短い割れ
+    const n = 4 + Math.floor(rnd() * 3), rays = [];
+    for (let k = 0; k < n; k++) { const a = k / n * 6.283 + (rnd() - .5) * .7, pts = []; fracture(g, cx + Math.cos(a) * R * .8, cy + Math.sin(a) * R * .8, a, 45 + rnd() * 75, 1.3, 1, 'rgba(38,37,36,.8)', 'rgba(255,255,255,.8)', 0.22, 0.1, pts); rays.push(pts); }
+    g.strokeStyle = 'rgba(40,39,38,.6)'; g.lineWidth = .7;
+    for (let k = 0; k < n; k++) {
+      const A = rays[k], B = rays[(k + 1) % n]; if (!A.length || !B.length || rnd() < .35) continue;
+      const pa = A[Math.min(A.length - 1, 1 + Math.floor(rnd() * 2))], pb = B[Math.min(B.length - 1, 1 + Math.floor(rnd() * 2))];
+      g.beginPath(); g.moveTo(pa[0], pa[1]); g.lineTo((pa[0] + pb[0]) / 2 + (rnd() - .5) * 6, (pa[1] + pb[1]) / 2 + (rnd() - .5) * 6); g.lineTo(pb[0], pb[1]); g.stroke();
+    }
   } else if (kind === 'wood') {
     // 扉・棚のえぐれ
     g.fillStyle = 'rgba(80,55,30,.6)'; g.beginPath(); g.ellipse(cx, cy, 16 + rnd() * 8, 8 + rnd() * 5, rnd() * 3, 0, 7); g.fill();
@@ -267,7 +315,7 @@ export const hole = (i) => make('hole' + i, 128, 128, (g, w, h) => {
   g.fillStyle = 'rgba(250,246,236,.95)'; g.beginPath(); pts.forEach((p, k) => { const q = [cx + (p[0] - cx) * 1.35, cy + (p[1] - cy) * 1.35]; k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.closePath(); g.fill();
   g.fillStyle = 'rgba(214,206,190,1)'; g.beginPath(); pts.forEach((p, k) => { const q = [cx + (p[0] - cx) * 1.12, cy + (p[1] - cy) * 1.12]; k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.closePath(); g.fill();
   g.fillStyle = 'rgba(22,18,15,1)'; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fill();
-  crack(g, cx, cy, 7, 60, 'rgba(50,42,34,.7)', 1.4);
+  for (let k = 0; k < 7; k++) fracture(g, cx, cy, k / 7 * 6.283 + rnd() * .5, 30 + rnd() * 34, 1.3, 2, 'rgba(50,42,34,.65)', 'rgba(255,255,255,.3)');
 });
 
 // ガラスのひび（窓・レンジ・時計）

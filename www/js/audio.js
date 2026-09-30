@@ -172,6 +172,11 @@ class Sfx {
     if (!this.ac) return; const t = this.t;
     this.tone(t, 988, 988, 0.08, 'square', 0.12); this.tone(t + 0.08, 1319, 1319, 0.35, 'square', 0.12);
   }
+  // ダイヤルのカチッ
+  tick() {
+    if (!this.ac || !this.throttle('tick', 0.03)) return; const t = this.t;
+    this.nz(t, 0.018, 'bandpass', 4200, 3, 0.25); this.tone(t, 1800, 1500, 0.02, 'square', 0.03);
+  }
   // メニューを選ぶピッ
   blip() {
     if (!this.ac || !this.throttle('blip', 0.05)) return; const t = this.t;
