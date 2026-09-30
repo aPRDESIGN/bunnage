@@ -164,6 +164,14 @@ class Sfx {
     return () => { try { g.gain.cancelScheduledValues(ac.currentTime); g.gain.setValueAtTime(0.0001, ac.currentTime); o.stop(ac.currentTime + 0.02); } catch (e) { /* 無視 */ } };
   }
 
+  // 電気がバチッとショートする音
+  zap() {
+    if (!this.ac || !this.throttle('zap', 0.08)) return; const t = this.t;
+    this.nz(t, 0.09, 'highpass', 2500, 0.8, 0.5);
+    for (let i = 0; i < 4; i++) this.tone(t + i * 0.025 + Math.random() * 0.01, 120 + Math.random() * 60, 100, 0.03, 'square', 0.12);
+    this.nz(t + 0.03, 0.18, 'bandpass', 5200, 2, 0.12, 2400);
+  }
+
   // ボディが凹む「ボコッ」
   thunk(v) {
     if (!this.ac || !this.throttle('thunk', 0.05)) return; const t = this.t;

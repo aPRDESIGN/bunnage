@@ -52,7 +52,7 @@ body.holding #itemBtn,body.holding #menuBtn,body.locked #itemBtn,body.locked #me
 
 /* ハンマー：叩く物の切り替え */
 #targetBar{position:fixed;left:50%;bottom:calc(var(--safe-b) + 18px);transform:translateX(-50%);display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
-#targetBar button{background:none;border:0;border-radius:999px;padding:8px 16px;font-size:14px;font-weight:700;color:var(--ink-dim)}
+#targetBar button{background:none;border:0;border-radius:999px;padding:8px 12px;white-space:nowrap;font-size:14px;font-weight:700;color:var(--ink-dim)}
 #targetBar button.on{background:var(--accent);color:#fff}
 body.holding #targetBar,body.locked #targetBar{opacity:.35;pointer-events:none}
 #walkHint{position:fixed;left:0;right:0;bottom:calc(var(--safe-b) + 74px);text-align:center;font-size:12px;color:var(--ink-dim);text-shadow:0 1px 6px rgba(0,0,0,.8);pointer-events:none}
@@ -131,7 +131,7 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
   <div id="pulse"></div>
   <p id="tutorial" hidden>ここを押さえたまま、<br>スマホを振ってみよう</p>
   <button id="itemBtn" type="button" aria-label="投げるものを変える"><svg><use href="#i-glass"/></svg><span id="itemName">グラス</span></button>
-  <div id="targetBar" hidden><button data-t="vase" class="on" type="button">壺</button><button data-t="stone" type="button">石の甕（かたい）</button></div>
+  <div id="targetBar" hidden><button data-t="plates" type="button">皿の山</button><button data-t="vase" class="on" type="button">壺</button><button data-t="stone" type="button">石の甕</button><button data-t="monitor" type="button">モニター</button></div>
   <p id="walkHint" hidden>左右にスワイプで、まわりを歩けます</p>
   <button id="menuBtn" type="button" aria-label="メニュー"><svg><use href="#i-menu"/></svg></button>
   <div id="notice" hidden></div>
@@ -154,7 +154,7 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
     <p class="lead">投げて、壊して、片付けない。</p>
     <button id="stageKitchen" class="stage-card" type="button"><b>キッチン</b><span>夜、ちょっと古いマンションの台所</span></button>
     <button id="stageWarehouse" class="stage-card" type="button"><b>倉庫と巨大な壺</b><span>人の背丈より大きい壺を、ひたすら割る</span></button>
-    <button id="stageHammer" class="stage-card" type="button"><b>ハンマーで叩き割る</b><span>壺のすぐそばに立って、振り下ろす。まわりも歩ける</span></button>
+    <button id="stageHammer" class="stage-card" type="button"><b>ハンマーで叩き割る</b><span>皿の山、壺、パソコンのモニター。すぐそばに立って振り下ろす</span></button>
     <!-- 隠しステージ：URLの最後に ?car を付けたときだけ出る --><button id="stageCar" class="stage-card" type="button" hidden><b>地下駐車場の車</b><span>赤いスポーツカーのガラスを割って、へこませる</span></button>
         <p class="safety">スマホは手から離さずに、しっかり握ったまま振ってください。まわりに人や物がないか確かめてから。</p>
   </div>
@@ -195,6 +195,6 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 <div id="fade"></div>
 <div id="rotate">縦向きで遊んでください</div>
 
-<script type="module" src="./js/main.js?v=202609300417"></script>
+<script type="module" src="./js/main.js?v=202609300453"></script>
 </body>
 </html>

@@ -2,11 +2,13 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609300417';
-import { sfx } from './audio.js?v=202609300417';
-import { Car } from './car.js?v=202609300417';
-import { GiantVase } from './vase.js?v=202609300417';
-import { haptics } from './haptics.js?v=202609300417';
+import * as TX from './textures.js?v=202609300453';
+import { sfx } from './audio.js?v=202609300453';
+import { Car } from './car.js?v=202609300453';
+import { PlateStack } from './plates.js?v=202609300453';
+import { Monitor } from './monitor.js?v=202609300453';
+import { GiantVase } from './vase.js?v=202609300453';
+import { haptics } from './haptics.js?v=202609300453';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -276,34 +278,73 @@ export class World {
   }
 
   // ================ 倉庫と巨大な壺 =================
-  // ハンマー：壺の間近に立つ。左右のスワイプで周りを歩く
+  // ハンマー：倉庫に3つの持ち場（左：皿の山、真ん中：壺か石の甕、右：机のモニター）。
+  // 選んだ物のすぐそばに立ち、左右のスワイプでそのまわりを歩く
   _hammerRoom() {
-    this._warehouse([{ x: 0, opts: { style: 'sometsuke', finishHits: 3 } }]);
+    this._warehouse([
+      { x: -2.7, opts: { type: 'plates' }, furniture: 'table' },
+      { x: 0, opts: { style: 'sometsuke', finishHits: 3 } },
+      { x: 2.7, opts: { type: 'monitor' }, furniture: 'desk' }
+    ]);
+    this.hammerSpots = {
+      vase: { slot: 1, r: 2.2, pitch: -0.2 }, stone: { slot: 1, r: 2.2, pitch: -0.2 },
+      plates: { slot: 0, r: 1.3, pitch: -0.42 }, monitor: { slot: 2, r: 1.2, pitch: -0.3 }
+    };
     this.orbitC = new THREE.Vector3(0, 0, -2.3); this.orbitR = 2.2;
+    this.orbitGoal = { c: this.orbitC.clone(), r: 2.2 };
     const top = new THREE.PointLight('#fff2dc', 7, 6, 2); top.position.set(-0.6, 3.4, -2.8); this.stage.add(top);
     const back = new THREE.PointLight('#aebfd6', 4, 6, 2); back.position.set(0.8, 2.2, -4.6); this.stage.add(back);
   }
-  // 叩く物を替える（今の物は崩して、次を上から落とす）
+  // 叩く物を選ぶ：その物のところへ歩いていく。壺と石の甕は同じ台なので入れ替える
   setHammerTarget(t) {
-    const slot = this.vaseSlots[0]; if (!slot) return;
-    slot.opts = t === 'stone' ? { style: 'stone', tough: true, finishHits: 8 } : { style: 'sometsuke', finishHits: 3 };
-    slot.target = t;
-    if (slot.pending) return;
-    if (slot.vase && !slot.vase.drop) slot.vase.collapseAll();
-    this._respawn(slot, 900);
+    const spot = this.hammerSpots && this.hammerSpots[t]; if (!spot) return;
+    const slot = this.vaseSlots[spot.slot];
+    this.orbitGoal = { c: new THREE.Vector3(slot.center.x, 0, slot.center.z), r: spot.r };
+    this.orbitA = 0; this.yaw = 0; this.pitch = spot.pitch;
+    if (t === 'vase' || t === 'stone') {
+      const want = t === 'stone';
+      if (!!slot.opts.tough === want) return;
+      slot.opts = want ? { style: 'stone', tough: true, finishHits: 8 } : { style: 'sometsuke', finishHits: 3 };
+      if (slot.pending) return;
+      if (slot.vase && !slot.vase.drop) slot.vase.collapseAll();
+      this._respawn(slot, 900);
+    }
+  }
+  _makeTarget(center, opts) {
+    if (opts.type === 'plates') return new PlateStack(this, center, opts);
+    if (opts.type === 'monitor') return new Monitor(this, center, opts);
+    return new GiantVase(this, center, opts);
   }
   _respawn(slot, delay) {
     slot.pending = true;
     const stageNow = this.stage;
     setTimeout(() => {
       if (this.stage !== stageNow) return;
-      if (slot.cycle && !slot.opts.tough) { const st = ['sometsuke', 'seiji', 'kuro']; slot.opts.style = st[(st.indexOf(slot.opts.style) + 1) % 3]; }
-      slot.vase = new GiantVase(this, slot.center, { ...slot.opts, drop: true });
+      if (slot.cycle && !slot.opts.tough && !slot.opts.type) { const st = ['sometsuke', 'seiji', 'kuro']; slot.opts.style = st[(st.indexOf(slot.opts.style) + 1) % 3]; }
+      slot.vase = this._makeTarget(slot.center, { ...slot.opts, drop: true });
       this.vases.push(slot.vase); slot.pending = false;
     }, delay);
   }
+  // 作業台（皿用）と事務机（モニター用）
+  _furniture(kind, x, z) {
+    const table = kind === 'table';
+    const H = table ? 0.78 : 0.72, w = table ? 1.3 : 1.2, d = table ? 0.75 : 0.65;
+    const top = this.mat(table ? '#8c6a45' : '#cfc9bd', table ? 0.75 : 0.5);
+    const leg = this.mat(table ? '#5d4630' : '#55585c', 0.6, table ? 0 : 0.6);
+    const tm = this.box(w, 0.04, d, x, H - 0.02, z, top, { surface: 'wood', cast: true });
+    if (tm) tm.userData.surface = 'wood';
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) this.box(0.05, H - 0.04, 0.05, x + sx * (w / 2 - 0.06), (H - 0.04) / 2, z + sz * (d / 2 - 0.06), leg, { surface: 'wood', cast: true });
+    if (!table) {
+      // キーボードとマウス（飾り）
+      const kb = this.box(0.44, 0.02, 0.14, x, H + 0.01, z + 0.2, this.mat('#2a2b2e', 0.5), { surface: 'wood' });
+      if (kb) kb.userData.surface = 'wood';
+      this.box(0.06, 0.02, 0.1, x + 0.34, H + 0.01, z + 0.2, this.mat('#2a2b2e', 0.5), { phys: false });
+    }
+    return H;
+  }
 
   _warehouse(slotDefs = [{ x: -1.9, opts: { style: 'seiji' } }, { x: 0, opts: { style: 'sometsuke' } }, { x: 1.9, opts: { style: 'kuro' } }]) {
+    const hammer = this.stageType === 'hammer';
     const X = 7, Z0 = -8, Z1 = 4, Hh = 6, W = X * 2, D = Z1 - Z0, T = 1.0;
     const floorMat = this.mat('#ffffff', 0.85, 0, { map: TX.concreteFloor(W / 2, D / 2) });
     this.box(W, 0.1, D, 0, -0.05, (Z0 + Z1) / 2, floorMat, { surface: 'floor', pd: [W + 2, T, D + 2], pp: [0, -T / 2, (Z0 + Z1) / 2] });
@@ -323,18 +364,19 @@ export class World {
     const wood = this.mat('#9c7a52', 0.8);
     const tape = this.mat('#ffffff', 0.7, 0, { map: TX.hazard() });
     this.vaseSlots = [];
-    slotDefs.forEach(({ x, opts }) => {
+    slotDefs.forEach(({ x, opts, furniture }) => {
       const center = new THREE.Vector3(x, 0.14, -2.3);
+      if (furniture) center.y = this._furniture(furniture, x, -2.3);
       const spot = new THREE.SpotLight('#fff0d8', 55, 12, 0.33, 0.55, 2);
       spot.position.set(x + 0.4, 6.0, -0.9); spot.target.position.set(x, 1.0, -2.3);
       if (x === 0) { spot.castShadow = true; spot.shadow.mapSize.set(1024, 1024); spot.shadow.bias = -0.0006; spot.shadow.normalBias = 0.02; spot.angle = 0.62; spot.intensity = 70; spot.target.position.set(0, 0.8, -2.3); }
       this.stage.add(spot, spot.target);
-      this.box(1.3, 0.14, 1.3, center.x, 0.07, center.z, wood, { surface: 'wood' });
-      this.vaseSlots.push({ center, opts: { ...opts }, vase: null, pending: false, cycle: slotDefs.length === 1 });
+      if (!furniture) { const pm = this.box(1.3, 0.14, 1.3, center.x, 0.07, center.z, wood, { surface: 'wood' }); if (pm) pm.userData.surface = 'wood'; }
+      this.vaseSlots.push({ center, opts: { ...opts }, vase: null, pending: false, cycle: hammer });
     });
     const fill = new THREE.PointLight('#8fa2bb', 5, 10, 2); fill.position.set(0, 3.2, 2.6); this.stage.add(fill);
     // 区画線
-    const sx = 3.0, sz = 1.3, cz = -2.3;
+    const sx = hammer ? 3.7 : 3.0, sz = 1.3, cz = -2.3;
     [[0, -sz, 0, sx * 2 + 0.1], [0, sz, 0, sx * 2 + 0.1], [-sx, 0, Math.PI / 2, sz * 2 + 0.1], [sx, 0, Math.PI / 2, sz * 2 + 0.1]].forEach(([dx, dz, r, len]) => {
       const m = this.plane(len, 0.12, dx, 0.003, cz + dz, tape, r, -Math.PI / 2); m.receiveShadow = true;
     });
@@ -344,7 +386,7 @@ export class World {
       const m = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.88, 24), this.mat(c, 0.5, 0.4)); m.position.set(x, 0.44, z); m.castShadow = m.receiveShadow = true; this.stage.add(m);
       const b = new CANNON.Body({ mass: 0 }); b.addShape(new CANNON.Cylinder(0.29, 0.29, 0.88, 12)); b.position.set(x, 0.44, z); b.ud = { static: true, surface: 'steel' }; this.physics.addBody(b);
     });
-    for (const slot of this.vaseSlots) { slot.vase = new GiantVase(this, slot.center, { ...slot.opts }); this.vases.push(slot.vase); }
+    for (const slot of this.vaseSlots) { slot.vase = this._makeTarget(slot.center, { ...slot.opts }); this.vases.push(slot.vase); }
   }
 
   _room() {
@@ -827,7 +869,7 @@ export class World {
     }
     const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : look.clone().negate();
     if (n.dot(look) > 0) n.negate();
-    const surface = h.point.y < 0.02 ? 'floor' : h.point.y < 0.16 && Math.abs(h.point.z + 2.3) < 0.7 ? 'wood' : 'wall';
+    const surface = h.object.userData.surface || (h.point.y < 0.02 ? 'floor' : 'wall');
     this._scuff(h.point, n, { ud: { static: true, surface } }, Math.max(2.6, v), 1.2);
     sfx.knock(Math.max(3, v * 0.7), surface === 'wood' ? 0.8 : 0.5);
     return true;
@@ -1374,6 +1416,7 @@ export class World {
     }
 
     if (this.stageType === 'hammer' && this.orbitC) {
+      if (this.orbitGoal) { const k = 1 - Math.exp(-dt * 5); this.orbitC.lerp(this.orbitGoal.c, k); this.orbitR += (this.orbitGoal.r - this.orbitR) * k; }
       const c = this.orbitC, r = this.orbitR;
       this.camera.position.set(c.x + Math.sin(this.orbitA) * r, EYE.y, c.z + Math.cos(this.orbitA) * r);
       this.camera.rotation.set(this.pitch, this.orbitA + this.yaw, 0, 'YXZ');
