@@ -4,9 +4,9 @@
 //  Swinger ：吊られた物（吊り革、中吊り広告、のれん）。当たると揺れる
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import * as TX from './textures.js?v=202609301019';
-import { sfx } from './audio.js?v=202609301019';
-import { haptics } from './haptics.js?v=202609301019';
+import * as TX from './textures.js?v=202609301033';
+import { sfx } from './audio.js?v=202609301033';
+import { haptics } from './haptics.js?v=202609301033';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

@@ -365,24 +365,40 @@ export const hole = (i) => make('hole' + i, 128, 128, (g, w, h) => {
 });
 
 // ガラスのひび（窓・レンジ・時計）
-export const glassCrack = (i) => make('gcrack' + i, 256, 256, (g, w, h) => {
+// ガラスのひび：当たった所に白く砕けた小さな点、そこから長いひびが数本、ゆるく曲がりながら走る
+// （クモの巣のような同心円は入れない）
+export const glassCrack = (i) => make('gcrack3_' + i, 512, 512, (g, w, h) => {
   g.clearRect(0, 0, w, h);
   const cx = w / 2, cy = h / 2;
-  g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.3;
-  const rays = 11 + Math.floor(rnd() * 5), ends = [];
-  for (let k = 0; k < rays; k++) {
-    let a = k / rays * 6.283 + rnd() * .3, x = cx, y = cy; const L = 70 + rnd() * 55; g.beginPath(); g.moveTo(x, y);
-    const pts = [];
-    for (let s = 1; s <= 6; s++) { a += (rnd() - .5) * .25; x = cx + Math.cos(a) * L * s / 6; y = cy + Math.sin(a) * L * s / 6; g.lineTo(x, y); pts.push([x, y]); }
-    g.stroke(); ends.push(pts);
+  const line = (pts, width, color) => { g.strokeStyle = color; g.lineWidth = width; g.lineJoin = 'round'; g.lineCap = 'round'; g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); };
+  const crackPath = (x, y, a, len, bend) => {
+    // ほぼまっすぐ。細かくぎざぎざして、ときどき小さく折れる
+    const pts = [[x, y]]; const steps = Math.max(4, Math.floor(len / 7)); const a0 = a;
+    for (let s = 0; s < steps; s++) { a += (rnd() - .5) * .22 * bend; if (rnd() < .07) a += (rnd() < .5 ? -1 : 1) * .28; a += (a0 - a) * .12; x += Math.cos(a) * len / steps; y += Math.sin(a) * len / steps; pts.push([x + (rnd() - .5) * 1.2, y + (rnd() - .5) * 1.2]); }
+    return pts;
+  };
+  const drawCrack = (pts, wdt) => { line(pts.map(p => [p[0] + .8, p[1] + .8]), wdt + .6, 'rgba(0,0,0,.18)'); line(pts, wdt, 'rgba(255,255,255,.9)'); };
+  // 長いひび（4〜7本）。ところどころで枝分かれ
+  const n = 4 + Math.floor(rnd() * 4);
+  for (let k = 0; k < n; k++) {
+    const a = k / n * 6.283 + (rnd() - .5) * .9, len = 120 + rnd() * 140;
+    const pts = crackPath(cx + Math.cos(a) * 10, cy + Math.sin(a) * 10, a, len, 1.2);
+    drawCrack(pts, 1.4);
+    if (rnd() < .6) { const q = pts[Math.floor(pts.length * (.3 + rnd() * .4))]; drawCrack(crackPath(q[0], q[1], a + (rnd() < .5 ? -1 : 1) * (.35 + rnd() * .4), len * (.25 + rnd() * .35), 1.4), 1.0); }
   }
-  g.lineWidth = .9; g.strokeStyle = 'rgba(255,255,255,.6)';
-  for (let ring = 1; ring <= 4; ring++) {
-    g.beginPath();
-    ends.forEach((pts, k) => { const p = pts[Math.min(5, ring)]; k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); });
-    g.closePath(); g.stroke();
-  }
-  g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.arc(cx, cy, 6, 0, 7); g.fill();
+  // 当たった所：白く砕けた小さな点と、細かい放射状のひび
+  const rg = g.createRadialGradient(cx, cy, 1, cx, cy, 16); rg.addColorStop(0, 'rgba(255,255,255,.95)'); rg.addColorStop(.6, 'rgba(235,242,245,.7)'); rg.addColorStop(1, 'rgba(235,242,245,0)');
+  g.fillStyle = rg; g.beginPath(); for (let a = 0; a < 14; a++) { const ang = a / 14 * 6.283, r = 9 + rnd() * 8; a ? g.lineTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r) : g.moveTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r); } g.closePath(); g.fill();
+  for (let k = 0; k < 22; k++) { const a = rnd() * 6.283, r0 = 4 + rnd() * 6, r1 = 14 + rnd() * 18; line([[cx + Math.cos(a) * r0, cy + Math.sin(a) * r0], [cx + Math.cos(a + (rnd() - .5) * .2) * r1, cy + Math.sin(a) * r1]], .7, 'rgba(255,255,255,.75)'); }
+  // 当たった所のまわりだけ、短い弧（途切れ途切れ）
+  g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = .8;
+  for (let k = 0; k < 3; k++) { const r = 22 + rnd() * 16, a0 = rnd() * 6.283; g.beginPath(); g.arc(cx, cy, r, a0, a0 + .4 + rnd() * .7); g.stroke(); }
+});
+
+// 煙（やわらかい丸）
+export const smoke = () => make('smoke', 64, 64, (g, w, h) => {
+  const rg = g.createRadialGradient(32, 32, 0, 32, 32, 32); rg.addColorStop(0, 'rgba(255,255,255,.9)'); rg.addColorStop(.5, 'rgba(255,255,255,.4)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, w, h);
 });
 
 // 掛け時計の文字盤

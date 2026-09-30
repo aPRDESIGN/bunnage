@@ -2,15 +2,15 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609301019';
-import { sfx } from './audio.js?v=202609301019';
-import { Car } from './car.js?v=202609301019';
-import { PlateStack } from './plates.js?v=202609301019';
-import { Monitor } from './monitor.js?v=202609301019';
-import { Pane, Fixture, Swinger } from './props.js?v=202609301019';
-import { ScrapCar } from './scrapcar.js?v=202609301019';
-import { GiantVase } from './vase.js?v=202609301019';
-import { haptics } from './haptics.js?v=202609301019';
+import * as TX from './textures.js?v=202609301033';
+import { sfx } from './audio.js?v=202609301033';
+import { Car } from './car.js?v=202609301033';
+import { PlateStack } from './plates.js?v=202609301033';
+import { Monitor } from './monitor.js?v=202609301033';
+import { Pane, Fixture, Swinger } from './props.js?v=202609301033';
+import { ScrapCar } from './scrapcar.js?v=202609301033';
+import { GiantVase } from './vase.js?v=202609301033';
+import { haptics } from './haptics.js?v=202609301033';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -205,7 +205,7 @@ export class World {
     this.vases = []; this.vaseSlots = [];
     this.car = null;
     this.orbitA = 0; this.hammerAnim = null; this.orbitC = null;
-    this.props = []; this.animators = [];
+    this.props = []; this.animators = []; this.smokes = [];
     this.headLamp.intensity = this.stageType === 'hammer' ? 1.4 : 0;
     if (this.stageType === 'warehouse') this._warehouse();
     else if (this.stageType === 'hammer') this._hammerRoom();
@@ -1936,6 +1936,32 @@ export class World {
     const pts = new THREE.Points(g, mat); pts.frustumCulled = false; this.stage.add(pts);
     this.puffs.push({ pts, vel, t: 0, life: 1.1 });
   }
+  // 立ちのぼる煙（ふわっと広がりながら上がって消える）
+  _smoke(pos, k = 1, color = '#8a8a8a') {
+    if (!this.smokes) this.smokes = [];
+    if (!this._smokeMat) this._smokeMat = TX.smoke();
+    const n = Math.round(2 + k * 4);
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._smokeMat, color, transparent: true, depthWrite: false, opacity: 0 }));
+      m.raycast = () => {}; // 狙いや当たり判定の邪魔をしない
+      m.position.copy(pos).add(new THREE.Vector3(rand(-0.15, 0.15) * k, rand(0, 0.1), rand(-0.15, 0.15) * k));
+      const s0 = rand(0.2, 0.35) * (0.6 + 0.4 * k); m.scale.setScalar(s0);
+      this.stage.add(m);
+      this.smokes.push({ m, t: 0, life: rand(1.6, 2.8), s0, vel: new THREE.Vector3(rand(-0.15, 0.15), rand(0.5, 0.9), rand(-0.15, 0.15)), op: rand(0.35, 0.6) });
+    }
+    while (this.smokes.length > 160) { const o = this.smokes.shift(); o.m.parent && o.m.parent.remove(o.m); o.m.material.dispose(); }
+  }
+  _updateSmoke(dt) {
+    if (!this.smokes) return;
+    for (const f of this.smokes) {
+      f.t += dt; const k = f.t / f.life;
+      f.m.position.addScaledVector(f.vel, dt); f.vel.y *= 0.995;
+      f.m.scale.setScalar(f.s0 * (1 + k * 3.5));
+      f.m.material.opacity = f.op * Math.min(1, f.t * 5) * (1 - k);
+      f.m.material.rotation += dt * 0.3;
+    }
+    this.smokes = this.smokes.filter(f => { if (f.t < f.life) return true; f.m.parent && f.m.parent.remove(f.m); f.m.material.dispose(); return false; });
+  }
   _updatePuffs(dt) {
     for (const f of this.puffs) {
       f.t += dt; const a = f.pts.geometry.attributes.position;
@@ -2031,6 +2057,7 @@ export class World {
 
     this._updateTrails(dt);
     this._updatePuffs(dt);
+    this._updateSmoke(dt);
 
     // 缶が転がる音
     for (const b of this.cans) {

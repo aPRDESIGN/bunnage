@@ -1,8 +1,8 @@
 // ハンマーで叩く廃車（スクラップ工場）。車本体は car.js をそのまま使い、叩く用の窓口だけここで用意する
 import * as THREE from 'three';
-import { Car } from './car.js?v=202609301019';
-import { sfx } from './audio.js?v=202609301019';
-import { haptics } from './haptics.js?v=202609301019';
+import { Car } from './car.js?v=202609301033';
+import { sfx } from './audio.js?v=202609301033';
+import { haptics } from './haptics.js?v=202609301033';
 
 export class ScrapCar {
   constructor(world, center, opts = {}) {
@@ -14,6 +14,7 @@ export class ScrapCar {
     this.drop = opts.drop ? { y: 4.5, vy: 0 } : null;
     this.car.group.position.set(center.x, this.drop ? this.drop.y : 0, center.z);
     this._pieces();
+    this.car.onHood = (mesh) => this.pieces.push({ mesh, part: 'hood', attached: true });
   }
 
   // 叩いて当たる部品の一覧（ボディ・ガラス・ライト）
@@ -32,7 +33,8 @@ export class ScrapCar {
     return inCar ? 0 : -1;
   }
 
-  get done() { const c = this.car; return (c.glassLeft === 0 && c.dents >= 10) || c.dents >= 20; }
+  // 車は勝手に入れ替えない（入れ替えたいときはメニューの「きれいにする」）
+  get done() { return false; }
   bakeNear() {}
   collapseAll() {}
 
