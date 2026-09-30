@@ -1,9 +1,9 @@
 // 壊せる車（赤いスポーツカー）：凹むボディ、割れるガラス、ライト、ミラー
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import * as TX from './textures.js?v=202609300610';
-import { sfx } from './audio.js?v=202609300610';
-import { haptics } from './haptics.js?v=202609300610';
+import * as TX from './textures.js?v=202609300857';
+import { sfx } from './audio.js?v=202609300857';
+import { haptics } from './haptics.js?v=202609300857';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

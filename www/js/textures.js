@@ -490,3 +490,29 @@ export const menuBoard = () => make('menub', 256, 320, (g, w, h) => {
   g.fillStyle = '#e6b54a'; g.fillText('本日貸切', 70, 300);
   noise(g, w, h, 4000, .12, false);
 });
+
+// 和食屋の厨房：グレーの防滑タイル（1枚で60cm角・30cm目地）
+export const kitchenTile = (rx, ry) => make('ktile', 256, 256, (g, w, h) => {
+  g.fillStyle = '#5f5d58'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) { const t = 88 + rnd() * 12; g.fillStyle = `rgb(${t},${t - 2},${t - 6})`; g.fillRect(x * 128 + 3, y * 128 + 3, 122, 122); }
+  for (let i = 0; i < 1400; i++) { g.fillStyle = `rgba(0,0,0,${.12 + rnd() * .15})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, .8 + rnd(), 0, 7); g.fill(); }
+  noise(g, w, h, 5000, .08);
+}, { repeat: [rx, ry] });
+
+// 短冊のお品書き（木の札）
+export const tanzaku = (text, price) => make('tz' + text, 64, 256, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#d9c29a'); gr.addColorStop(1, '#cbb186');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(120,85,45,.25)'; for (let k = 0; k < 8; k++) { g.beginPath(); const x = rnd() * w; g.moveTo(x, 0); g.lineTo(x + rnd() * 4 - 2, h); g.stroke(); }
+  g.fillStyle = '#1b1510'; g.font = 'bold 30px serif'; g.textAlign = 'center';
+  [...text].forEach((ch, i) => g.fillText(ch, w / 2, 40 + i * 32));
+  g.fillStyle = '#8a1f16'; g.font = 'bold 18px serif'; g.fillText(price, w / 2, h - 14);
+});
+
+// 紺の暖簾（白抜きの文字）
+export const noren = (ch) => make('noren' + ch, 128, 256, (g, w, h) => {
+  g.fillStyle = '#1d2c4d'; g.fillRect(0, 0, w, h);
+  noise(g, w, h, 3000, .1, false);
+  g.fillStyle = '#efe9dc'; g.font = 'bold 84px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, w / 2, h * 0.45);
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, w, 10);
+});

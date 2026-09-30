@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300610';
-import { SwingDetector } from './motion.js?v=202609300610';
-import { sfx } from './audio.js?v=202609300610';
-import { haptics, hapticSettings } from './haptics.js?v=202609300610';
+import { World } from './world.js?v=202609300857';
+import { SwingDetector } from './motion.js?v=202609300857';
+import { sfx } from './audio.js?v=202609300857';
+import { haptics, hapticSettings } from './haptics.js?v=202609300857';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -20,7 +20,7 @@ function resize() { world.resize(window.innerWidth, window.innerHeight); }
 window.addEventListener('resize', resize); resize();
 
 // ---------------- 状態 ----------------
-let mode = 'title';          // title | stage | item | hammer | play
+let mode = 'title';          // title | mode | stage | item | hammer | play
 let item = 'glass';
 let holding = false, holdEnding = false;
 let lockUntil = 0;           // 投擲完了までカメラとUIをロック
@@ -32,13 +32,14 @@ let debugOn = false;
 function show(id) {
   const prev = mode;
   $('#titleScreen').hidden = id !== 'title';
+  $('#modeScreen').hidden = id !== 'mode';
   $('#stageScreen').hidden = id !== 'stage';
   $('#itemScreen').hidden = id !== 'item';
   $('#hammerScreen').hidden = id !== 'hammer';
   $('#hud').hidden = id !== 'play';
   mode = id;
   // メニュー画面はブラウン管が点くように出す
-  const el = { stage: '#stageScreen', item: '#itemScreen', hammer: '#hammerScreen' }[id];
+  const el = { mode: '#modeScreen', stage: '#stageScreen', item: '#itemScreen', hammer: '#hammerScreen' }[id];
   if (el && prev !== id) { const e = $(el); e.classList.remove('power-on'); void e.offsetWidth; e.classList.add('power-on'); }
 }
 
@@ -99,7 +100,7 @@ function shatterTitle(ev) {
     $('#tFlash').animate([{ opacity: 0.85 }, { opacity: 0 }], { duration: 260, easing: 'ease-out' });
   }, 700);
   setTimeout(() => {
-    show('stage');
+    show('mode');
     scr.classList.remove('broken'); scr.querySelectorAll('.t-shard').forEach(e => e.remove());
     titleBusy = false;
   }, 1750);
@@ -133,12 +134,13 @@ async function enterStage(type, hammerKind) {
   } else show('item');
 }
 document.querySelectorAll('#hammerScreen [data-hk]').forEach(b => b.addEventListener('click', () => enterStage('hammer', b.dataset.hk)));
-$('#hammerBack').addEventListener('click', () => show('stage'));
+$('#hammerBack').addEventListener('click', () => show('mode'));
+$('#stageBack').addEventListener('click', () => show('mode'));
+document.querySelectorAll('#modeScreen [data-mode]').forEach(b => b.addEventListener('click', () => show(b.dataset.mode === 'hammer' ? 'hammer' : 'stage')));
 $('#itemBack').addEventListener('click', () => show('stage'));
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));
 $('#stageWarehouse').addEventListener('click', () => enterStage('warehouse'));
 $('#stageCar').addEventListener('click', () => enterStage('car'));
-$('#stageHammer').addEventListener('click', () => { sfx.unlock(); show('hammer'); });
 if (/[?&]car\b/.test(location.search)) $('#stageCar').hidden = false; // 隠しステージ
 
 document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {
@@ -319,7 +321,7 @@ $('#cOk').addEventListener('click', () => {
   const f = $('#fade'); f.classList.add('on');
   setTimeout(() => { world.reset(); world.equip(item); setTimeout(() => f.classList.remove('on'), 120); }, 320);
 });
-$('#mStage').addEventListener('click', () => { $('#menu').hidden = true; endHold(); show('stage'); });
+$('#mStage').addEventListener('click', () => { $('#menu').hidden = true; endHold(); show(world.stageType === 'hammer' ? 'hammer' : 'stage'); });
 
 // ---------------- 調整用の表示 ----------------
 function renderDebug() {

@@ -109,10 +109,13 @@ class Sfx {
   // ベチャッ（卵）
   egg(p) {
     if (!this.ac || !this.throttle('egg', 0.04)) return; const t = this.t;
-    this.nz(t, 0.05, 'bandpass', 2600, 2, 0.35);                  // 殻が割れるパキッ
-    this.nz(t + 0.01, 0.22, 'lowpass', 1400, 1.2, 0.7 * (0.6 + 0.4 * p), 180, 0.01); // ベチャ
-    this.nz(t + 0.03, 0.18, 'bandpass', 900, 4, 0.25, 300, 0.02);  // 湿った粘り
-    this.tone(t, 140, 60, 0.12, 'sine', 0.3);
+    const k = 0.7 + 0.3 * p;
+    this.nz(t, 0.035, 'bandpass', 3200, 2, 0.45);                              // 殻がパキッ
+    this.nz(t + 0.004, 0.32, 'lowpass', 2400, 0.9, 1.4 * k, 150, 0.003);      // ベチャッ（重く、強く）
+    this.nz(t + 0.008, 0.11, 'bandpass', 650, 1.4, 1.0 * k, 240, 0.003);       // 中身の塊が当たる
+    this.nz(t + 0.035, 0.28, 'bandpass', 1250, 5, 0.4 * k, 360, 0.02);        // ぬちゃっと広がる
+    this.tone(t, 190, 50, 0.16, 'sine', 0.7 * k);
+    for (let i = 0; i < 6; i++) this.nz(t + 0.05 + Math.random() * 0.18, 0.045, 'bandpass', rand(1400, 3200), 4, rand(0.08, 0.16)); // しずくが飛ぶ
   }
 
   // カンッ（缶）

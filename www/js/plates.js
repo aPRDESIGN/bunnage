@@ -1,8 +1,8 @@
 // 皿の山：テーブルの上に積んだ白い皿。叩いた所の皿は割れ、その上に積まれていた皿は崩れ落ちて床で割れる
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { sfx } from './audio.js?v=202609300610';
-import { haptics } from './haptics.js?v=202609300610';
+import { sfx } from './audio.js?v=202609300857';
+import { haptics } from './haptics.js?v=202609300857';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

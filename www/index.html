@@ -155,6 +155,11 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 .screen.arcade .pick button{background:rgba(10,8,12,.9);border:2px solid rgba(53,224,255,.45);border-radius:2px;font-family:var(--f-dot);font-size:17px;font-weight:400}
 .screen.arcade .pick button.hit{background:#08303a;border-color:var(--neon2)}
 .screen.arcade .pick small{font-family:var(--f-dot)}
+.screen.arcade .soon-card{opacity:.4;border-style:dashed;cursor:default}
+.screen.arcade .soon-card:hover{border-color:rgba(255,43,61,.55);box-shadow:none}
+.screen.arcade .soon-card:hover::before{opacity:0}
+.screen.arcade .mode-card{padding-top:22px;padding-bottom:22px}
+.screen.arcade .mode-card b{font-size:30px}
 .screen.arcade .back{font-family:var(--f-px);font-size:11px;color:#9a95a0;text-decoration:none;letter-spacing:.1em}
 .screen.arcade .safety{font-family:var(--f-dot);font-size:13px;color:#ffcf5a;border-left-color:#ffcf5a}
 .screen.power-on .inner{animation:powerOn .45s ease-out}
@@ -211,20 +216,30 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
   <div id="tFlash"></div>
 </section>
 
+<section id="modeScreen" class="screen arcade" hidden>
+  <div class="inner">
+    <div class="a-head"><p class="a-kick">SELECT MODE</p><p class="a-logo">ぶん投げ部屋</p></div>
+    <button class="stage-card mode-card" data-mode="throw" type="button"><i>MODE A / THROW</i><b>ぶん投げる</b><span>グラス、卵、缶を投げて、部屋のものを割る</span></button>
+    <button class="stage-card mode-card" data-mode="hammer" type="button"><i>MODE B / HAMMER</i><b>叩き割る</b><span>すぐそばに立って、ハンマーを振り下ろす</span></button>
+    <p class="safety">スマホは手から離さずに、しっかり握ったまま振ってください。まわりに人や物がないか確かめてから。</p>
+  </div>
+</section>
+
 <section id="stageScreen" class="screen arcade" hidden>
   <div class="inner">
-    <div class="a-head"><p class="a-kick">SELECT STAGE</p><p class="a-logo">ぶん投げ部屋</p></div>
-    <button id="stageKitchen" class="stage-card" type="button"><i>STAGE 01</i><b>キッチン</b><span>夜、ちょっと古いマンションの台所。投げて割る</span></button>
+    <div class="a-head"><p class="a-kick">MODE A / THROW</p><p class="a-title">ステージを選べ</p></div>
+    <button id="stageKitchen" class="stage-card" type="button"><i>STAGE 01</i><b>キッチン</b><span>夜、ちょっと古いマンションの台所</span></button>
     <button id="stageWarehouse" class="stage-card" type="button"><i>STAGE 02</i><b>倉庫と巨大な壺</b><span>人の背丈より大きい壺を、ひたすら割る</span></button>
-    <button id="stageHammer" class="stage-card" type="button"><i>STAGE 03</i><b>ハンマーで叩き割る</b><span>厨房の皿、美術館の壺、オフィスのモニター</span></button>
+    <button class="stage-card soon-card" type="button" disabled><i>STAGE 03 / COMING SOON</i><b>夜の街</b><span>準備中</span></button>
+    <button class="stage-card soon-card" type="button" disabled><i>STAGE 04 / COMING SOON</i><b>終電の車内</b><span>準備中</span></button>
     <!-- 隠しステージ：URLの最後に ?car を付けたときだけ出る --><button id="stageCar" class="stage-card" type="button" hidden><i>SECRET</i><b>地下駐車場の車</b><span>赤いスポーツカーのガラスを割って、へこませる</span></button>
-    <p class="safety">スマホは手から離さずに、しっかり握ったまま振ってください。まわりに人や物がないか確かめてから。</p>
+    <button id="stageBack" class="back" type="button">&lt; BACK</button>
   </div>
 </section>
 
 <section id="hammerScreen" class="screen arcade" hidden>
   <div class="inner">
-    <div class="a-head"><p class="a-kick">STAGE 03 / HAMMER</p><p class="a-title">叩くものを選べ</p></div>
+    <div class="a-head"><p class="a-kick">MODE B / HAMMER</p><p class="a-title">叩くものを選べ</p></div>
     <button class="stage-card" data-hk="plates" type="button"><i>閉店後の厨房</i><b>皿の山</b><span>積んだ白い皿。叩くとガシャンと崩れる</span></button>
     <button class="stage-card" data-hk="vase" type="button"><i>夜の美術館</i><b>壺</b><span>大きな壺。3回くらいで割れる</span></button>
     <button class="stage-card" data-hk="stone" type="button"><i>夜の美術館</i><b>石の甕</b><span>かたい。強く何回も叩いてやっと割れる</span></button>
@@ -269,6 +284,6 @@ h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px}
 <div id="fade"></div>
 <div id="rotate">縦向きで遊んでください</div>
 
-<script type="module" src="./js/main.js?v=202609300610"></script>
+<script type="module" src="./js/main.js?v=202609300857"></script>
 </body>
 </html>
