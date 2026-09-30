@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300357';
-import { SwingDetector } from './motion.js?v=202609300357';
-import { sfx } from './audio.js?v=202609300357';
-import { haptics, hapticSettings } from './haptics.js?v=202609300357';
+import { World } from './world.js?v=202609300401';
+import { SwingDetector } from './motion.js?v=202609300401';
+import { sfx } from './audio.js?v=202609300401';
+import { haptics, hapticSettings } from './haptics.js?v=202609300401';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -46,6 +46,7 @@ async function enterStage(type) {
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));
 $('#stageWarehouse').addEventListener('click', () => enterStage('warehouse'));
 $('#stageCar').addEventListener('click', () => enterStage('car'));
+if (/[?&]car\b/.test(location.search)) $('#stageCar').hidden = false; // 隠しステージ
 
 document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {
   sfx.unlock();

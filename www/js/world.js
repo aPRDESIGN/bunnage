@@ -2,11 +2,11 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609300357';
-import { sfx } from './audio.js?v=202609300357';
-import { Car } from './car.js?v=202609300357';
-import { GiantVase } from './vase.js?v=202609300357';
-import { haptics } from './haptics.js?v=202609300357';
+import * as TX from './textures.js?v=202609300401';
+import { sfx } from './audio.js?v=202609300401';
+import { Car } from './car.js?v=202609300401';
+import { GiantVase } from './vase.js?v=202609300401';
+import { haptics } from './haptics.js?v=202609300401';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
