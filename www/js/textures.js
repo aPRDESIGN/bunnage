@@ -564,3 +564,130 @@ export const noren = (ch) => make('noren' + ch, 128, 256, (g, w, h) => {
   g.fillStyle = '#efe9dc'; g.font = 'bold 84px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, w / 2, h * 0.45);
   g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, w, 10);
 });
+
+// ================= 夜の街 =================
+// 濡れたアスファルト（1枚で2m角）
+export const asphalt = (rx, ry) => make('asph', 512, 512, (g, w, h) => {
+  g.fillStyle = '#2b2b2d'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26000; i++) { const t = 30 + rnd() * 70; g.fillStyle = `rgba(${t},${t},${t + 3},${.35 + rnd() * .4})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 1.6, 1 + rnd() * 1.6); }
+  for (let i = 0; i < 8; i++) { const x = rnd() * w, y = rnd() * h, r = 40 + rnd() * 120; const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, 'rgba(0,0,0,.35)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  crack(g, rnd() * w, rnd() * h, 3, 200, 'rgba(10,10,10,.5)', 1.4);
+}, { repeat: [rx, ry] });
+
+// ビルの外壁（窓のあかりがぽつぽつ）1枚で6m×6m
+export const facade = (i) => make('facade' + i, 512, 512, (g, w, h) => {
+  const base = ['#3a3531', '#2f3338', '#3b3f3a', '#40362f'][i % 4];
+  g.fillStyle = base; g.fillRect(0, 0, w, h);
+  noise(g, w, h, 12000, .12);
+  const cols = 4 + (i % 2), rows = 5;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const x = 20 + c * (w - 40) / cols, y = 24 + r * (h - 40) / rows, ww = (w - 40) / cols - 26, hh = (h - 40) / rows - 38;
+    const lit = rnd() < .35;
+    g.fillStyle = lit ? (rnd() < .7 ? '#e9c98a' : '#bcd6f0') : '#15171a'; g.fillRect(x, y, ww, hh);
+    if (lit) { g.fillStyle = 'rgba(0,0,0,.25)'; for (let k = 0; k < 3; k++) g.fillRect(x + rnd() * ww, y, 3, hh); }
+    g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(x - 3, y + hh, ww + 6, 4);
+    // 室外機
+    if (rnd() < .3) { g.fillStyle = '#a8aaa8'; g.fillRect(x + ww * .6, y + hh + 6, 30, 20); g.fillStyle = '#555'; g.beginPath(); g.arc(x + ww * .6 + 12, y + hh + 16, 7, 0, 7); g.fill(); }
+  }
+  g.fillStyle = 'rgba(0,0,0,.35)'; for (let x = 0; x < w; x += w / 2) g.fillRect(x, 0, 3, h);
+});
+
+// シャッター
+export const shutter = () => make('shutter', 256, 256, (g, w, h) => {
+  for (let y = 0; y < h; y += 8) { const gr = g.createLinearGradient(0, y, 0, y + 8); gr.addColorStop(0, '#8e9194'); gr.addColorStop(.5, '#b4b7b9'); gr.addColorStop(1, '#6d7073'); g.fillStyle = gr; g.fillRect(0, y, w, 8); }
+  noise(g, w, h, 5000, .15);
+  g.fillStyle = 'rgba(120,70,30,.25)'; for (let i = 0; i < 20; i++) g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 20, 2 + rnd() * 5);
+});
+
+// ネオン管の文字（黒地に光る文字。emissiveMapに使う）
+export const neon = (text, color, font = 'bold 96px sans-serif', vertical = false) => make('neon' + text + color + vertical, vertical ? 128 : 512, vertical ? 512 : 160, (g, w, h) => {
+  g.fillStyle = '#050505'; g.fillRect(0, 0, w, h);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = font;
+  const draw = () => { if (vertical) [...text].forEach((ch, k) => g.fillText(ch, w / 2, h / (text.length + 1) * (k + 1))); else g.fillText(text, w / 2, h / 2 + 4); };
+  g.shadowColor = color; g.shadowBlur = 26; g.fillStyle = color; draw(); draw();
+  g.shadowBlur = 6; g.fillStyle = '#ffffff'; g.globalAlpha = .75; draw(); g.globalAlpha = 1;
+});
+
+// 自販機の前面（架空の飲み物）
+export const vending = () => make('vend', 256, 512, (g, w, h) => {
+  g.fillStyle = '#f2f4f5'; g.fillRect(0, 0, w, h);
+  const cols = ['#c8261d', '#1d5fb0', '#e9a21b', '#1f8a4c', '#6b3fa0', '#d9d9d9', '#202020', '#c86a1d'];
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 6; c++) {
+    const x = 14 + c * 38, y = 30 + r * 92;
+    g.fillStyle = cols[(r * 3 + c * 5) % cols.length]; g.fillRect(x, y, 26, 52);
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(x + 4, y + 4, 5, 44);
+    g.fillStyle = '#222'; g.font = 'bold 12px sans-serif'; g.fillText(['130', '150', '160', '180'][r], x, y + 68);
+    g.fillStyle = r === 3 && c === 2 ? '#e53' : '#2a8'; g.fillRect(x + 6, y + 74, 14, 6);
+  }
+  g.fillStyle = '#1c1c1c'; g.fillRect(0, 400, w, 112);
+  g.fillStyle = '#333'; g.fillRect(30, 440, 196, 50);
+  g.fillStyle = '#c8261d'; g.fillRect(0, 0, w, 18);
+});
+
+// ショーウィンドウの奥（あかりの付いた店内）
+export const shopInside = (i) => make('shopin' + i, 512, 256, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, ['#f3e2c2', '#dfe9f2', '#f0d8d8'][i % 3]); gr.addColorStop(1, '#6f6358');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  for (let s = 0; s < 3; s++) { const y = 60 + s * 62; g.fillStyle = '#8a6a48'; g.fillRect(0, y, w, 6); for (let x = 8; x < w - 10; x += 14 + rnd() * 20) { g.fillStyle = `hsl(${rnd() * 360},45%,${40 + rnd() * 30}%)`; const hh = 14 + rnd() * 30; g.fillRect(x, y - hh, 8 + rnd() * 14, hh); } }
+  noise(g, w, h, 4000, .08);
+});
+
+// 遠くの夜空とビルのシルエット
+export const skyline = () => make('skyline', 1024, 256, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#05070d'); gr.addColorStop(1, '#27213a'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w;) { const bw = 30 + rnd() * 70, bh = 60 + rnd() * 170; g.fillStyle = '#0b0c12'; g.fillRect(x, h - bh, bw, bh); for (let y = h - bh + 8; y < h; y += 12) for (let xx = x + 5; xx < x + bw - 5; xx += 9) if (rnd() < .25) { g.fillStyle = rnd() < .8 ? '#e3c486' : '#9cc6ee'; g.fillRect(xx, y, 4, 5); } x += bw + rnd() * 6; }
+  g.fillStyle = '#ff3b3b'; for (let i = 0; i < 6; i++) g.fillRect(rnd() * w, h - 200 + rnd() * 60, 3, 3);
+});
+
+// ================= 終電の車内 =================
+// 座席のモケット（青緑に細かい柄）
+export const moquette = (rx, ry) => make('moq', 128, 128, (g, w, h) => {
+  g.fillStyle = '#23566a'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 8) for (let x = (y / 8) % 2 * 4; x < w; x += 8) { g.fillStyle = 'rgba(160,210,220,.18)'; g.fillRect(x, y, 3, 3); }
+  noise(g, w, h, 4000, .12);
+}, { repeat: [rx, ry] });
+
+// 車内の床（グレーのゴムに細かい粒）
+export const trainFloor = (rx, ry) => make('tfloor', 256, 256, (g, w, h) => {
+  g.fillStyle = '#6c6a66'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 5000; i++) { g.fillStyle = rnd() < .5 ? 'rgba(30,30,30,.35)' : 'rgba(230,228,220,.3)'; g.fillRect(rnd() * w, rnd() * h, 1.5, 1.5); }
+}, { repeat: [rx, ry] });
+
+// 窓の外：流れていく夜景（横に長い帯。オフセットを動かして流す）
+export const passing = () => make('passing', 1024, 256, (g, w, h) => {
+  g.fillStyle = '#04060b'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w;) { const bw = 20 + rnd() * 80, bh = 30 + rnd() * 150; g.fillStyle = '#0a0c13'; g.fillRect(x, h - bh, bw, bh); for (let y = h - bh + 6; y < h; y += 10) for (let xx = x + 4; xx < x + bw - 4; xx += 8) if (rnd() < .22) { g.fillStyle = rnd() < .8 ? '#d9b675' : '#8fbde6'; g.fillRect(xx, y, 3, 4); } x += bw + rnd() * 20; }
+  // 近くを流れる街灯の光（横に伸びたすじ）
+  for (let i = 0; i < 9; i++) { const y = 20 + rnd() * 120, x = rnd() * w; const gr = g.createLinearGradient(x, 0, x + 180, 0); gr.addColorStop(0, 'rgba(255,220,160,0)'); gr.addColorStop(.5, 'rgba(255,220,160,.55)'); gr.addColorStop(1, 'rgba(255,220,160,0)'); g.fillStyle = gr; g.fillRect(x, y, 180, 3); }
+  // 架線の柱
+  for (let x = 0; x < w; x += 170) { g.fillStyle = '#12141a'; g.fillRect(x + rnd() * 30, 0, 6, h); }
+});
+
+// 中吊り広告（架空）
+export const trainAd = (i) => make('tad' + i, 512, 256, (g, w, h) => {
+  const ads = [
+    ['#f5d23a', '#1b1b1b', '月曜日が、つらい人へ。', '有給休暇、ちゃんと使ってますか？'],
+    ['#1f5fa8', '#ffffff', '週末は、温泉へ。', '各駅停車で行く、ゆるい旅'],
+    ['#ffffff', '#c8261d', '英会話、はじめよう', '3ヶ月で話せる（かもしれない）'],
+    ['#2b2b2b', '#f0e0b0', '新ドラマ 金曜よる10時', '「定時で帰ります。」'],
+    ['#e9f3ea', '#1f7a45', '転職するなら、今。', 'あなたの市場価値、しらべます']
+  ][i % 5];
+  g.fillStyle = ads[0]; g.fillRect(0, 0, w, h);
+  g.fillStyle = ads[1]; g.font = 'bold 44px sans-serif'; g.fillText(ads[2], 28, 100);
+  g.font = '24px sans-serif'; g.fillText(ads[3], 30, 160);
+  g.globalAlpha = .15; g.beginPath(); g.arc(w - 70, h - 60, 90, 0, 7); g.fill(); g.globalAlpha = 1;
+  g.strokeStyle = 'rgba(0,0,0,.2)'; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6);
+});
+
+// ドアの上の案内表示
+export const trainLCD = () => make('tlcd', 512, 128, (g, w, h) => {
+  g.fillStyle = '#060606'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#ff8a1c'; g.font = 'bold 50px sans-serif'; g.fillText('次は 終点', 22, 62);
+  g.fillStyle = '#7fd0ff'; g.font = '26px sans-serif'; g.fillText('Next  Terminal', 24, 104);
+  g.fillStyle = '#39d353'; g.font = 'bold 28px sans-serif'; g.fillText('0:42', 400, 104);
+});
+
+// 車内の壁（クリーム色の化粧板）
+export const trainWall = (rx, ry) => make('twall', 128, 128, (g, w, h) => {
+  g.fillStyle = '#e8e2d2'; g.fillRect(0, 0, w, h); noise(g, w, h, 1500, .04);
+}, { repeat: [rx, ry] });

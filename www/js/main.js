@@ -1,7 +1,7 @@
-import { World } from './world.js?v=202609300922';
-import { SwingDetector } from './motion.js?v=202609300922';
-import { sfx } from './audio.js?v=202609300922';
-import { haptics, hapticSettings } from './haptics.js?v=202609300922';
+import { World } from './world.js?v=202609300943';
+import { SwingDetector } from './motion.js?v=202609300943';
+import { sfx } from './audio.js?v=202609300943';
+import { haptics, hapticSettings } from './haptics.js?v=202609300943';
 
 const $ = (s) => document.querySelector(s);
 const D2R = Math.PI / 180;
@@ -121,7 +121,7 @@ async function enterStage(type, hammerKind) {
   if (!permAsked) { permAsked = true; await det.requestPermission(); det.start(); }
   if (hammerKind) world.hammerKind = hammerKind;
   world.reset(type);
-  world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.24 : type === 'hammer' ? world.hammerPitch : -0.12;
+  world.yaw = 0; world.pitch = type === 'warehouse' ? -0.04 : type === 'car' ? -0.24 : type === 'hammer' ? world.hammerPitch : type === 'street' ? 0.02 : type === 'train' ? -0.04 : -0.12;
   const hammer = type === 'hammer';
   $('#wheel').hidden = hammer; $('#walkHint').hidden = !hammer;
   $('#tutorial').innerHTML = hammer ? TUT_HAMMER : TUT_THROW;
@@ -141,6 +141,8 @@ $('#itemBack').addEventListener('click', () => show('stage'));
 $('#stageKitchen').addEventListener('click', () => enterStage('cg'));
 $('#stageWarehouse').addEventListener('click', () => enterStage('warehouse'));
 $('#stageCar').addEventListener('click', () => enterStage('car'));
+$('#stageStreet').addEventListener('click', () => enterStage('street'));
+$('#stageTrain').addEventListener('click', () => enterStage('train'));
 if (/[?&]car\b/.test(location.search)) $('#stageCar').hidden = false; // 隠しステージ
 
 document.querySelectorAll('#itemScreen [data-kind]').forEach(b => b.addEventListener('click', () => {

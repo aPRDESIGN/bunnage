@@ -2,13 +2,14 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { RoomEnvironment } from '../vendor/RoomEnvironment.js';
-import * as TX from './textures.js?v=202609300922';
-import { sfx } from './audio.js?v=202609300922';
-import { Car } from './car.js?v=202609300922';
-import { PlateStack } from './plates.js?v=202609300922';
-import { Monitor } from './monitor.js?v=202609300922';
-import { GiantVase } from './vase.js?v=202609300922';
-import { haptics } from './haptics.js?v=202609300922';
+import * as TX from './textures.js?v=202609300943';
+import { sfx } from './audio.js?v=202609300943';
+import { Car } from './car.js?v=202609300943';
+import { PlateStack } from './plates.js?v=202609300943';
+import { Monitor } from './monitor.js?v=202609300943';
+import { Pane, Fixture, Swinger } from './props.js?v=202609300943';
+import { GiantVase } from './vase.js?v=202609300943';
+import { haptics } from './haptics.js?v=202609300943';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -151,7 +152,7 @@ export class World {
   // 明るさ（写真のステージは写真に合わせて明るめ）
   _setLightLevel(k) {
     this.ceilLight.intensity = 2.0 * k; this.sun.intensity = 0.55 * k; this.underLight.intensity = 1.6 * k;
-    this.winLight.intensity = 0.9 * k; this.hemi.intensity = k > 0 ? 0.16 : (this.stageType === 'car' ? 0.13 : 0.07);
+    this.winLight.intensity = 0.9 * k; this.hemi.intensity = k > 0 ? 0.16 : (this.stageType === 'car' ? 0.13 : this.stageType === 'street' || this.stageType === 'train' ? 0.12 : 0.07);
     if (this.lampMat) this.lampMat.emissiveIntensity = 0.9;
   }
 
@@ -193,9 +194,12 @@ export class World {
     this.vases = []; this.vaseSlots = [];
     this.car = null;
     this.orbitA = 0; this.hammerAnim = null; this.orbitC = null;
+    this.props = []; this.animators = [];
     this.headLamp.intensity = this.stageType === 'hammer' ? 1.4 : 0;
     if (this.stageType === 'warehouse') this._warehouse();
     else if (this.stageType === 'hammer') this._hammerRoom();
+    else if (this.stageType === 'street') this._street();
+    else if (this.stageType === 'train') this._train();
     else if (this.stageType === 'car') this._parking();
     else { this._room(); this._counter(); this._fridge(); this._cupboard(); this._rack(); this._items(); }
     this._setLightLevel(this.stageType === 'cg' || !this.stageType ? 1 : 0);
@@ -495,6 +499,234 @@ export class World {
     lamp(0, C.z, true); lamp(-2.2, -1.0, false); lamp(2.0, -0.6, false);
     this._keySpot(C, '#ffdcae', 40, new THREE.Vector3(0, 2.1, C.z), 0.9);
     const fill = new THREE.PointLight('#9aa6b8', 2.0, 8, 2); fill.position.set(0, 2.3, 0.6); this.stage.add(fill);
+  }
+
+  // ================ 投げる：夜の街（飲み屋の並ぶ裏通り） =================
+  _street() {
+    const X = 3.4, Z0 = -16, Z1 = 3.2, T = 1.0, BH = 10;
+    const D = Z1 - Z0, cz = (Z0 + Z1) / 2;
+    const floor = this.box(X * 2, 0.1, D, 0, -0.05, cz, this.mat('#ffffff', 0.45, 0, { map: TX.asphalt(X, D / 2) }), { surface: 'floor', pd: [X * 2 + 4, T, D + 4], pp: [0, -T / 2, cz] }); floor.userData.surface = 'floor';
+    // 両側と奥のビル
+    const bmat = (i, w) => this.mat('#ffffff', 0.85, 0, { map: (() => { const t = TX.facade(i).clone(); t.needsUpdate = true; t.repeat.set(w / 6, BH / 6); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })() });
+    const wall = (x, z, w, d, i) => { const m = this.box(w, BH, d, x, BH / 2, z, bmat(i, Math.max(w, d)), { surface: 'wall' }); m.userData.surface = 'wall'; return m; };
+    wall(-X - 0.5, cz, 1, D, 0); wall(X + 0.5, cz, 1, D, 1); wall(0, Z0 - 0.5, X * 2 + 2, 1, 2); wall(0, Z1 + 0.5, X * 2 + 2, 1, 3);
+    // 歩道の縁石
+    for (const sx of [-1, 1]) this.box(0.7, 0.12, D, sx * (X - 0.35), 0.06, cz, this.mat('#77756f', 0.8), { surface: 'floor' });
+    // 1階の店先（腰から下の暗いタイルと、看板の帯）
+    const front = (side, z0, z1, color) => {
+      const len = z0 - z1, zc = (z0 + z1) / 2, x = side * (X - 0.01);
+      this.plane(len, 3.0, x, 1.5, zc, this.mat(color, 0.7), side < 0 ? Math.PI / 2 : -Math.PI / 2);
+    };
+    // ショーウィンドウ：壁から少し出して、奥に明るい店内
+    const shopWindow = (side, zc, len, inside, frameColor = '#2a2a2a') => {
+      const xw = side * (X - 0.42), rot = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+      const tex = TX.shopInside(inside);
+      this.plane(len, 1.7, side * (X - 0.02), 1.35, zc, this.mat('#ffffff', 0.9, 0, { map: tex, emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 0.7 }), rot);
+      const fm = this.mat(frameColor, 0.5, 0.4);
+      this.box(0.42, 0.5, len + 0.1, side * (X - 0.21), 0.25, zc, fm, { surface: 'wood' });
+      this.box(0.42, 0.25, len + 0.1, side * (X - 0.21), 2.33, zc, fm, { surface: 'wood' });
+      for (const dz of [-1, 1]) this.box(0.42, 1.8, 0.06, side * (X - 0.21), 1.35, zc + dz * len / 2, fm, { surface: 'wood' });
+      const glow = new THREE.PointLight('#ffe2b0', 1.6, 3.2, 2); glow.position.set(side * (X - 0.6), 1.5, zc); this.stage.add(glow);
+      this.props.push(new Pane(this, { pos: new THREE.Vector3(xw, 1.35, zc), w: len, h: 1.7, rotY: rot, cracks: 2 }));
+    };
+    // ネオン看板：壁から直角に突き出た縦型、または壁に付いた横型
+    const neonSign = (text, color, pos, w, h, rotY, vertical) => {
+      const tex = TX.neon(text, color, vertical ? 'bold 88px sans-serif' : 'bold 92px sans-serif', vertical);
+      const mat = this.mat('#111111', 0.5, 0, { emissive: '#ffffff', emissiveMap: tex, emissiveIntensity: 1.6 });
+      const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = rotY; this.stage.add(g);
+      const box = new THREE.Mesh(new THREE.BoxGeometry(w + 0.08, h + 0.08, 0.14), this.mat('#1a1a1c', 0.5, 0.4)); g.add(box);
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); f.position.z = 0.072; g.add(f);
+      const b2 = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); b2.position.z = -0.072; b2.rotation.y = Math.PI; g.add(b2);
+      const l = new THREE.PointLight(color, 2.2, 5, 2); l.position.copy(pos); this.stage.add(l);
+      const half = rotY % Math.PI === 0 ? [w / 2 + 0.04, h / 2 + 0.04, 0.08] : [0.08, h / 2 + 0.04, w / 2 + 0.04];
+      this.props.push(new Fixture(this, { meshes: [f], lights: [l], pos, half, neon: true, glassColor: color }));
+      f.material = mat; b2.material = mat;
+    };
+    // 提灯（赤）
+    const chochin = (pos) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.2, 18, 12), this.mat('#b3261c', 0.7, 0, { emissive: '#ff4a22', emissiveIntensity: 0.9 }));
+      m.scale.y = 1.35; m.position.copy(pos); this.stage.add(m);
+      for (const dy of [0.27, -0.27]) { const r = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.04, 14), this.mat('#161616', 0.6)); r.position.set(pos.x, pos.y + dy, pos.z); this.stage.add(r); }
+      const l = new THREE.PointLight('#ff5a2a', 1.3, 3, 2); l.position.copy(pos); this.stage.add(l);
+      this.props.push(new Fixture(this, { meshes: [m], lights: [l], pos, half: [0.2, 0.27, 0.2], glassColor: '#c8342a' }));
+    };
+    // 街灯
+    const streetLamp = (x, z) => {
+      const sx = Math.sign(x);
+      const pole = this.mat('#3b3d40', 0.5, 0.6);
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 4.4, 10), pole); p.position.set(x, 2.2, z); this.stage.add(p);
+      const pb = new CANNON.Body({ mass: 0 }); pb.addShape(new CANNON.Cylinder(0.08, 0.08, 4.4, 8)); pb.position.set(x, 2.2, z); pb.ud = { static: true, surface: 'steel' }; this.physics.addBody(pb);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.05, 0.05), pole); arm.position.set(x - sx * 0.42, 4.35, z); this.stage.add(arm);
+      const pos = new THREE.Vector3(x - sx * 0.85, 4.2, z);
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), this.mat('#fff4dc', 0.2, 0, { emissive: '#ffd89a', emissiveIntensity: 2.2 })); m.position.copy(pos); this.stage.add(m);
+      const l = new THREE.PointLight('#ffcf8a', 7, 11, 2); l.position.set(pos.x, pos.y - 0.2, pos.z); this.stage.add(l);
+      this.props.push(new Fixture(this, { meshes: [m], lights: [l], pos, half: [0.17, 0.17, 0.17], glassColor: '#fff6e0' }));
+    };
+
+    // ---- 左側：居酒屋、スナック、シャッター ----
+    front(-1, Z1, -3.2, '#2a1d15');
+    shopWindow(-1, -1.3, 2.2, 0, '#3b2a1c');
+    for (let k = 0; k < 3; k++) this.plane(0.34, 0.55, -(X - 0.45), 2.0, -1.3 - 0.36 + k * 0.36, this.mat('#ffffff', 0.9, 0, { map: TX.noren(['屋', '酒', '居'][k]), side: THREE.DoubleSide }), Math.PI / 2);
+    chochin(new THREE.Vector3(-(X - 0.55), 2.45, 0.1)); chochin(new THREE.Vector3(-(X - 0.55), 2.45, -2.7));
+    neonSign('居酒屋', '#ff5a3c', new THREE.Vector3(-(X - 0.55), 3.9, -3.3), 0.5, 1.5, 0, true);
+    front(-1, -3.6, -7.2, '#1c1624');
+    shopWindow(-1, -5.3, 2.4, 2, '#26202e');
+    neonSign('スナック 夜', '#ff4fd8', new THREE.Vector3(-(X - 0.06), 3.1, -5.3), 2.2, 0.62, Math.PI / 2, false);
+    this.plane(3.6, 2.9, -(X - 0.02), 1.45, -9.4, this.mat('#ffffff', 0.5, 0.6, { map: TX.shutter() }), Math.PI / 2);
+    // ビールケースと瓶
+    const crate = this.mat('#e0b31e', 0.6);
+    this.box(0.45, 0.3, 0.35, -(X - 0.85), 0.15, -3.45, crate, { surface: 'wood', cast: true });
+    this.box(0.45, 0.3, 0.35, -(X - 0.85), 0.45, -3.45, crate, { surface: 'wood', cast: true });
+    for (let k = 0; k < 6; k++) {
+      const b = this.makeBottle('#5a2f12', null, [[0, 0], [0.034, 0], [0.034, 0.17], [0.014, 0.23], [0.014, 0.29], [0, 0.29]], 0.92);
+      this.addDynamic(b, new CANNON.Cylinder(0.034, 0.034, 0.29, 10), 0.5, new THREE.Vector3(-(X - 0.72) - (k % 3) * 0.12, 0.75, -3.52 + Math.floor(k / 3) * 0.14), { breakable: true, kind: 'glass', shards: 20, breakV: 2.0 });
+    }
+    // ---- 右側：雑貨屋のショーウィンドウ、自販機、ラーメン屋、シャッター ----
+    front(1, Z1, -2.8, '#26282b');
+    shopWindow(1, -0.9, 2.6, 1, '#1f2124');
+    // 自販機
+    {
+      const zc = -3.7, x = X - 0.42;
+      this.box(0.72, 1.82, 0.95, x + 0.02, 0.91, zc, this.mat('#d8dcdf', 0.4, 0.3), { surface: 'steel', cast: true });
+      const vt = TX.vending();
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 1.62), this.mat('#ffffff', 0.5, 0, { map: vt, emissive: '#ffffff', emissiveMap: vt, emissiveIntensity: 0.85 }));
+      face.position.set(x - 0.345, 0.95, zc); face.rotation.y = -Math.PI / 2; this.stage.add(face);
+      const l = new THREE.PointLight('#dfefff', 2.4, 4, 2); l.position.set(x - 0.9, 1.1, zc); this.stage.add(l);
+      this.props.push(new Fixture(this, { meshes: [face], lights: [l], pos: new THREE.Vector3(x - 0.33, 0.95, zc), half: [0.03, 0.8, 0.41], glassColor: '#dfe9ee', hp: 2 }));
+      this.props.push(new Pane(this, { pos: new THREE.Vector3(x - 0.37, 1.0, zc), w: 0.8, h: 1.2, rotY: -Math.PI / 2, cracks: 1, opacity: 0.15 }));
+    }
+    front(1, -4.6, -8.0, '#2b1a14');
+    shopWindow(1, -6.3, 2.4, 0, '#3a1f16');
+    neonSign('ラーメン', '#ff3b2f', new THREE.Vector3(X - 0.55, 3.9, -8.2), 0.48, 1.7, 0, true);
+    this.plane(3.4, 2.9, X - 0.02, 1.45, -10.6, this.mat('#ffffff', 0.5, 0.6, { map: TX.shutter() }), -Math.PI / 2);
+    // ゴミ袋
+    for (let k = 0; k < 4; k++) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), this.mat('#101010', 0.35, 0.1)); m.scale.set(1, 0.8, 1); this.addDynamic(m, new CANNON.Sphere(0.2), 1.2, new THREE.Vector3(X - 0.6 - (k % 2) * 0.3, 0.2 + Math.floor(k / 2) * 0.3, -9.2 - k * 0.25), { kind: 'soft' }); }
+    // ---- 奥：カラオケの大きなネオン ----
+    neonSign('カラオケ', '#35e0ff', new THREE.Vector3(0, 5.2, Z0 + 0.12), 3.2, 0.9, 0, false);
+    neonSign('BAR', '#ffd23a', new THREE.Vector3(-1.9, 2.9, Z0 + 0.12), 1.1, 0.45, 0, false);
+    this.plane(2.2, 2.4, 1.2, 1.2, Z0 + 0.02, this.mat('#ffffff', 0.5, 0.6, { map: TX.shutter() }), 0);
+    // 街灯、電柱と電線
+    streetLamp(-2.9, -2.4); streetLamp(2.9, -7.4); streetLamp(-2.9, -12.2);
+    {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 8, 12), this.mat('#9a978f', 0.8)); pole.position.set(2.95, 4, -13.2); this.stage.add(pole);
+      const pb = new CANNON.Body({ mass: 0 }); pb.addShape(new CANNON.Cylinder(0.18, 0.18, 8, 8)); pb.position.set(2.95, 4, -13.2); pb.ud = { static: true, surface: 'wall' }; this.physics.addBody(pb);
+      const wire = this.mat('#0a0a0a', 0.8);
+      for (const [a, b] of [[[2.95, 7.5, -13.2], [-3.4, 7.2, -4]], [[2.95, 7.2, -13.2], [-3.4, 6.9, -2]], [[2.95, 7.6, -13.2], [3.4, 7.4, 3]]]) {
+        const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), M = A.clone().lerp(B, 0.5); M.y -= 0.5;
+        this.stage.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(A, M, B), 20, 0.012, 4), wire));
+      }
+    }
+    // 水たまり（街の明かりが映る）
+    for (const [x, z, r] of [[0.6, -2.2, 0.8], [-1.0, -6.8, 1.1], [1.4, -10.5, 0.7]]) {
+      const m = new THREE.Mesh(new THREE.CircleGeometry(r, 24), new THREE.MeshStandardMaterial({ color: '#0b0c10', roughness: 0.02, metalness: 0.9, envMapIntensity: 3 }));
+      m.rotation.x = -Math.PI / 2; m.scale.set(1.4, 1, 1); m.position.set(x, 0.004, z); this.stage.add(m);
+    }
+    // 夜空の色
+    const sky = new THREE.PointLight('#5a5f8a', 2.5, 20, 2); sky.position.set(0, 9, -6); this.stage.add(sky);
+  }
+
+  // ================ 投げる：終電の車内 =================
+  _train() {
+    const X = 1.45, Z0 = -16.5, Z1 = 3.0, Hh = 2.35, T = 1.0;
+    const D = Z1 - Z0, cz = (Z0 + Z1) / 2;
+    const fl = this.box(X * 2, 0.1, D, 0, -0.05, cz, this.mat('#ffffff', 0.8, 0, { map: TX.trainFloor(X * 2 / 1.2, D / 1.2) }), { surface: 'floor', pd: [X * 2 + 2, T, D + 2], pp: [0, -T / 2, cz] }); fl.userData.surface = 'floor';
+    const wallM = this.mat('#ffffff', 0.55, 0, { map: TX.trainWall(2, 2) });
+    for (const sx of [-1, 1]) { const w = this.box(0.1, Hh, D, sx * (X + 0.05), Hh / 2, cz, wallM, { surface: 'wall', pd: [T, Hh + 2, D + 2], pp: [sx * (X + T / 2), Hh / 2, cz] }); w.userData.surface = 'wall'; }
+    for (const z of [Z0 - 0.05, Z1 + 0.05]) { const w = this.box(X * 2, Hh, 0.1, 0, Hh / 2, z, wallM, { surface: 'wall', pd: [X * 2 + 2, Hh + 2, T], pp: [0, Hh / 2, z + Math.sign(z - cz) * (T / 2 - 0.05)] }); w.userData.surface = 'wall'; }
+    this.box(X * 2, 0.1, D, 0, Hh + 0.05, cz, this.mat('#f1efe8', 0.6), { surface: 'wall', pd: [X * 2 + 2, T, D + 2], pp: [0, Hh + T / 2, cz] });
+    // 天井の曲がり（肩の部分）
+    for (const sx of [-1, 1]) this.box(0.35, 0.12, D, sx * (X - 0.17), Hh - 0.1, cz, this.mat('#e6e3da', 0.6), { phys: false });
+    const chrome = this.mat('#d5d8da', 0.2, 1), seatBase = this.mat('#3c3f44', 0.6, 0.3), moq = this.mat('#ffffff', 0.95, 0, { map: TX.moquette(8, 1) });
+    const doorsZ = [0.9, -4.3, -9.5, -14.7], DW = 1.3;
+    // 窓の外：流れる夜景（左右で流れる向きが逆）
+    const outs = [];
+    // 座席・窓・荷物棚・吊り革（ドアとドアの間）
+    const segs = [];
+    for (let k = 0; k < doorsZ.length - 1; k++) segs.push([doorsZ[k] - DW / 2 - 0.05, doorsZ[k + 1] + DW / 2 + 0.05]);
+    segs.push([doorsZ[3] - DW / 2 - 0.05, Z0 + 0.1]);
+    segs.unshift([Z1 - 0.1, doorsZ[0] + DW / 2 + 0.05]);
+    for (const [za, zb] of segs) {
+      const len = za - zb, zc = (za + zb) / 2; if (len < 0.8) continue;
+      for (const sx of [-1, 1]) {
+        this.box(0.5, 0.36, len, sx * (X - 0.3), 0.18, zc, seatBase, { surface: 'steel' });
+        this.box(0.52, 0.1, len, sx * (X - 0.29), 0.41, zc, moq, { surface: 'wood', cast: true });
+        this.box(0.1, 0.5, len, sx * (X - 0.06), 0.72, zc, moq, { surface: 'wood' });
+        // 窓（1.3mごと）
+        const nW = Math.max(1, Math.round(len / 1.4)), wl = len / nW;
+        for (let w = 0; w < nW; w++) {
+          const wz = za - wl * (w + 0.5);
+          const pt = TX.passing().clone(); pt.needsUpdate = true; pt.wrapS = THREE.RepeatWrapping; pt.repeat.set(0.35, 1); pt.offset.x = Math.random();
+          const out = this.plane(wl - 0.12, 0.72, sx * (X - 0.004), 1.32, wz, new THREE.MeshBasicMaterial({ map: pt, color: '#9aa0a8' }), sx < 0 ? Math.PI / 2 : -Math.PI / 2);
+          outs.push([pt, sx]);
+          this.props.push(new Pane(this, { pos: new THREE.Vector3(sx * (X - 0.03), 1.32, wz), w: wl - 0.12, h: 0.72, rotY: sx < 0 ? Math.PI / 2 : -Math.PI / 2, cracks: 1, opacity: 0.2, frame: '#b9bcbf' }));
+        }
+        // 荷物棚
+        this.box(0.3, 0.02, len, sx * (X - 0.18), 1.86, zc, chrome, { phys: false });
+        // 吊り革
+        this.box(0.03, 0.03, len, sx * 0.72, 1.98, zc, chrome, { phys: false });
+        for (let z = za - 0.25; z > zb + 0.1; z -= 0.42) {
+          const piv = new THREE.Group(); piv.position.set(sx * 0.72, 1.97, z); this.stage.add(piv);
+          const band = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.24, 0.012), this.mat('#e8e6df', 0.7)); band.position.y = -0.12; piv.add(band);
+          const ring = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.012, 8, 20), this.mat('#f2f2ee', 0.4)); ring.position.y = -0.31; piv.add(ring);
+          this.props.push(new Swinger(this, { pivot: piv, half: [0.08, 0.17, 0.03], center: new THREE.Vector3(sx * 0.72, 1.72, z), k: 22, damp: 0.9 }));
+        }
+      }
+    }
+    this.animators.push((dt) => { for (const [t, sx] of outs) t.offset.x += dt * 0.28 * sx; });
+    // ドア（両側）、ドアの窓、手すり、案内表示
+    const doorM = this.mat('#c9cdd0', 0.35, 0.6);
+    doorsZ.forEach((dz, k) => {
+      for (const sx of [-1, 1]) {
+        this.box(0.06, 2.0, DW, sx * (X - 0.03), 1.0, dz, doorM, { surface: 'steel' });
+        this.box(0.02, 2.0, 0.03, sx * (X - 0.065), 1.0, dz, this.mat('#1b1b1b', 0.6), { phys: false });
+        for (const off of [-0.3, 0.3]) {
+          const pt = TX.passing().clone(); pt.needsUpdate = true; pt.wrapS = THREE.RepeatWrapping; pt.repeat.set(0.12, 0.8); pt.offset.x = Math.random();
+          this.plane(0.36, 0.72, sx * (X - 0.065), 1.35, dz + off, new THREE.MeshBasicMaterial({ map: pt, color: '#8a9098' }), sx < 0 ? Math.PI / 2 : -Math.PI / 2);
+          outs.push([pt, sx]);
+          this.props.push(new Pane(this, { pos: new THREE.Vector3(sx * (X - 0.075), 1.35, dz + off), w: 0.36, h: 0.72, rotY: sx < 0 ? Math.PI / 2 : -Math.PI / 2, cracks: 1, opacity: 0.2 }));
+        }
+        // 縦の手すり
+        for (const e of [-1, 1]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, Hh, 10), chrome); p.position.set(sx * (X - 0.45), Hh / 2, dz + e * (DW / 2 + 0.12)); this.stage.add(p); }
+      }
+      // 案内表示（片側のドアの上）
+      if (k === 1 || k === 2) {
+        const tx = TX.trainLCD(), sx = k === 1 ? -1 : 1;
+        const m = this.plane(0.8, 0.2, sx * (X - 0.05), 2.12, dz, this.mat('#111111', 0.4, 0, { emissive: '#ffffff', emissiveMap: tx, emissiveIntensity: 1.1 }), sx < 0 ? Math.PI / 2 : -Math.PI / 2);
+        this.box(0.06, 0.26, 0.88, sx * (X - 0.02), 2.12, dz, this.mat('#2a2a2a', 0.5), { phys: false });
+        this.props.push(new Fixture(this, { meshes: [m], pos: new THREE.Vector3(sx * (X - 0.05), 2.12, dz), half: [0.05, 0.12, 0.42], glassColor: '#222' }));
+      }
+    });
+    // 天井の蛍光灯（2列）
+    const tubeLights = [];
+    for (let z = Z1 - 0.8, n = 0; z > Z0 + 0.5; z -= 1.6, n++) {
+      for (const x of [-0.55, 0.55]) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 1.3), this.mat('#ffffff', 0.3, 0, { emissive: '#eef6ff', emissiveIntensity: 1.3 }));
+        m.position.set(x, Hh - 0.03, z); this.stage.add(m);
+        let lights = [];
+        if (x < 0 && n % 3 === 0) { const l = new THREE.PointLight('#e8f0ff', 3.2, 6, 2); l.position.set(0, Hh - 0.3, z); this.stage.add(l); lights = [l]; }
+        this.props.push(new Fixture(this, { meshes: [m], lights, pos: new THREE.Vector3(x, Hh - 0.03, z), half: [0.06, 0.04, 0.65], glassColor: '#f4f6f8' }));
+      }
+    }
+    // 中吊り広告（通路の上）
+    [[-2.0, 0], [-7.0, 1], [-12.2, 2], [0.2, 3], [-5.4, 4]].forEach(([z, i]) => {
+      const piv = new THREE.Group(); piv.position.set(0, Hh - 0.02, z); this.stage.add(piv);
+      const t = TX.trainAd(i);
+      const a = new THREE.Mesh(new THREE.PlaneGeometry(0.76, 0.38), this.mat('#ffffff', 0.8, 0, { map: t, side: THREE.DoubleSide })); a.position.y = -0.3; piv.add(a);
+      for (const sx of [-0.35, 0.35]) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.12, 0.005), chrome); c.position.set(sx, -0.06, 0); piv.add(c); }
+      this.props.push(new Swinger(this, { pivot: piv, half: [0.38, 0.19, 0.03], center: new THREE.Vector3(0, Hh - 0.32, z), k: 14, damp: 0.7 }));
+    });
+    // 奥の連結部の扉
+    this.box(0.9, 2.0, 0.05, 0, 1.0, Z0 + 0.03, doorM, { surface: 'steel' });
+    this.props.push(new Pane(this, { pos: new THREE.Vector3(0, 1.35, Z0 + 0.06), w: 0.5, h: 0.7, rotY: 0, cracks: 1, opacity: 0.35, tint: '#23303a' }));
+    // 座席に置いていかれた空き缶と瓶
+    const S = 0.46;
+    [[-(X - 0.32), -2.6], [(X - 0.32), -6.6], [-(X - 0.32), -11.0], [(X - 0.3), -1.4]].forEach(([x, z], k) => {
+      if (k === 3) { const b = this.makeBottle('#2f6b3a', null, [[0, 0], [0.03, 0], [0.03, 0.16], [0.012, 0.2], [0.012, 0.24], [0, 0.24]], 0.85); this.addDynamic(b, new CANNON.Cylinder(0.03, 0.03, 0.24, 10), 0.45, new THREE.Vector3(x, S + 0.12, z), { breakable: true, kind: 'glass', shards: 18, breakV: 2.0 }); return; }
+      const c = this.makeCan(); c.rotation.z = k === 1 ? Math.PI / 2 : 0; const bdy = this.addDynamic(c, new CANNON.Cylinder(0.033, 0.033, 0.122, 10), 0.05, new THREE.Vector3(x, S + (k === 1 ? 0.035 : 0.062), z), { kind: 'can', dents: 0 }, { material: this.matCan, rotZ: k === 1 ? Math.PI / 2 : 0 }); this.cans.push(bdy);
+    });
+    // ガタンゴトン
+    let clk = 0.6;
+    this.animators.push((dt) => { clk -= dt; if (clk <= 0) { clk = 1.15 + Math.random() * 0.25; sfx.rail(); setTimeout(() => sfx.rail(0.8), 150); } });
   }
 
   // 支えが無くなった所に積もっていた破片を消す
@@ -1233,6 +1465,11 @@ export class World {
         ud.vaseHits = (ud.vaseHits || 0) + 1;
         const vs = oud.vase; if (vs.pieces[oud.idx].attached) vs.hit(oud.idx, e.point, v, b.mass, e.normal.clone().negate(), ud.kind);
       }
+      // ガラス・ネオン・吊り革など（投げるステージの備品）
+      if (oud.prop && solid && v > 1.2 && ud.kind !== 'vasePiece' && (ud.propHits || 0) < 2) {
+        ud.propHits = (ud.propHits || 0) + 1;
+        oud.prop.hit(e.point, e.normal.clone().negate(), v, b.mass, ud.kind);
+      }
       // 窓ガラス・天井の照明
       if (oud.surface === 'window' && solid && v > 2) this._hitWindow(e.point, e.normal, v);
       if (oud.surface === 'lamp' && solid && v > 1.8) this._breakLamp();
@@ -1243,7 +1480,7 @@ export class World {
         sfx.glass(0.25);
       }
       // 当たった所に傷（投げた物、または重い物が勢いよく当たったとき）
-      if (oud.static && oud.surface !== 'window' && oud.surface !== 'lamp' && oud.surface !== 'vase' && oud.surface !== 'car' && ud.kind !== 'vasePiece' && v > 2.5 && ud.kind !== 'egg' && solid && (ud.scuffs || 0) < 4 && (ud.thrown || b.mass >= 0.5)) {
+      if (oud.static && !oud.prop && oud.surface !== 'window' && oud.surface !== 'lamp' && oud.surface !== 'vase' && oud.surface !== 'car' && ud.kind !== 'vasePiece' && v > 2.5 && ud.kind !== 'egg' && solid && (ud.scuffs || 0) < 4 && (ud.thrown || b.mass >= 0.5)) {
         ud.scuffs = (ud.scuffs || 0) + 1;
         this._scuff(e.point, e.normal, e.other, v, b.mass);
       }
@@ -1566,6 +1803,8 @@ export class World {
       if (c.done && !c.leaving && !c.arrive && this.clock - c.lastHit > 2.5) c.leave();
       if (c.gone) this.car = new Car(this, c.home, c.yaw, { arrive: true });
     }
+    for (const pr of this.props) pr.update && pr.update(dt);
+    for (const f of this.animators) f(dt);
     // 壺：割り切ったら、少しして同じ場所に次の壺を落とす
     for (const v of this.vases) v.update(dt);
     for (const slot of this.vaseSlots || []) {

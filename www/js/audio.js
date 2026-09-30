@@ -172,6 +172,12 @@ class Sfx {
     if (!this.ac) return; const t = this.t;
     this.tone(t, 988, 988, 0.08, 'square', 0.12); this.tone(t + 0.08, 1319, 1319, 0.35, 'square', 0.12);
   }
+  // 線路のつなぎ目（ガタン）
+  rail(k = 1) {
+    if (!this.ac) return; const t = this.t;
+    this.tone(t, 72, 48, 0.12, 'sine', 0.22 * k); this.nz(t, 0.08, 'lowpass', 500, 0.8, 0.18 * k);
+    this.tone(t + 0.005, 900, 820, 0.03, 'triangle', 0.02 * k);
+  }
   // ダイヤルのカチッ
   tick() {
     if (!this.ac || !this.throttle('tick', 0.03)) return; const t = this.t;
